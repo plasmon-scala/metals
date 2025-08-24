@@ -37,7 +37,7 @@ abstract class CompilerAccess[+Reporter, Compiler](
   private val logger: Logger =
     Logger.getLogger(classOf[CompilerAccess[_, _]].getName)
 
-  val jobs = CompilerJobQueue()
+  val jobs = CompilerJobQueue(userLogger)
   private var __compiler: CompilerWrapper[_, Compiler] = _
   private def _compiler: CompilerWrapper[Reporter, Compiler] =
     __compiler.asInstanceOf[CompilerWrapper[Reporter, Compiler]]
