@@ -42,13 +42,13 @@ abstract class ScalaDocPrinter {
           .mkString("\n", "\n", "")
       else "",
       if (c.note.nonEmpty)
-        s"\n$notesTitle" +
+        s"\n\n***\n\n$notesTitle" +
           c.note
             .map(body => s"$note " + blocksToText(body.blocks))
             .mkString("\n")
       else "",
       if (c.typeParams.nonEmpty)
-        s"\n$typeParamsTitle" +
+        s"\n\n***\n\n$typeParamsTitle" +
           sortInSection("tparam", c.typeParams.toSeq)
             .map(tuple =>
               s"$typeParam ${wrapParam(tuple._1)}: " + blocksToText(
@@ -59,7 +59,10 @@ abstract class ScalaDocPrinter {
       else
         "",
       if (c.valueParams.nonEmpty)
-        s"\n$parametersTitle" + sortInSection("param", c.valueParams.toSeq)
+        s"\n\n***\n\n$parametersTitle" + sortInSection(
+          "param",
+          c.valueParams.toSeq
+        )
           .map(tuple =>
             s"$param ${wrapParam(tuple._1)}: " + blocksToText(tuple._2.blocks)
           )
@@ -72,7 +75,7 @@ abstract class ScalaDocPrinter {
           .mkString("\n")
       else "",
       if (c.throws.nonEmpty)
-        s"\n$throwsTitle" + sortInSection("throws", c.throws.toSeq)
+        s"\n\n***\n\n$throwsTitle" + sortInSection("throws", c.throws.toSeq)
           .map(tuple =>
             s"$throws ${wrapParam(tuple._1)}: " + tuple._2.summary
               .map(inlineToText)
@@ -81,7 +84,7 @@ abstract class ScalaDocPrinter {
           .mkString("", "\n", "\n")
       else "",
       if (c.see.nonEmpty)
-        s"\n$seeTitle" + c.see
+        s"\n\n***\n\n$seeTitle" + c.see
           .map { body => s"$see ${blocksToText(body.blocks).trim}" }
           .mkString("", "\n", "\n")
       else ""
