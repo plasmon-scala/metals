@@ -91,7 +91,8 @@ case class ScalaPresentationCompiler(
     sourcePath: ju.function.Supplier[ju.List[Path]] = () => Nil.asJava,
     semanticdbFileManager: SemanticdbFileManager = SemanticdbFileManager.EMPTY,
     optReportContext: Option[ReportContext] = None
-) extends PresentationCompiler {
+) extends PresentationCompiler
+    with HasCompilerAccess {
 
   implicit val executionContext: ExecutionContextExecutor = ec
 
@@ -166,7 +167,7 @@ case class ScalaPresentationCompiler(
         |${options.mkString(" ")}
         |""".stripMargin
 
-  val compilerAccess =
+  val compilerAccess: ScalaCompilerAccess =
     new ScalaCompilerAccess(
       logger,
       config,
