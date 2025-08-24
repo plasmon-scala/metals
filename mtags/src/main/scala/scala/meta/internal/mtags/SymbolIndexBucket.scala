@@ -478,9 +478,8 @@ class SymbolIndexBucket(
       case _ =>
         s.TextDocuments(Nil)
     }
-    if (docs.documents.nonEmpty) {
+    if (docs.documents.nonEmpty)
       addTextDocuments(this, originOpt, SourcePath(input.path), docs)
-    }
   } catch {
     case NonFatal(e) =>
       // pprint.err.log("Error indexing " + input.path)
