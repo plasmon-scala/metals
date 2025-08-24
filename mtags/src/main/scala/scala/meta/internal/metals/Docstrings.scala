@@ -168,11 +168,12 @@ class Docstrings(
   def expireSymbolDefinition(
       module: GlobalSymbolIndex.Module,
       path: AbsolutePath,
-      dialect: Dialect
+      dialectOpt: Option[Dialect]
   ): Unit = {
     path.toLanguage match {
       case Language.SCALA =>
-        new Deindexer(module, path.toInput, dialect).indexRoot()
+        for (dialect <- dialectOpt)
+          new Deindexer(module, path.toInput, dialect).indexRoot()
       case _ =>
     }
   }
