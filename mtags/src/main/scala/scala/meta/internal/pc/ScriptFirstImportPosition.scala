@@ -150,12 +150,8 @@ object ScriptFirstImportPosition {
             foundCommentThatIsNotUsingDirective
           )
         case _ =>
-          // There is an empty line between the comment and the code, so its not a doc
-          val maybeOffset =
-            if (newLines > 1 || !foundCommentThatIsNotUsingDirective) lastOffset
-            else beforeComment
-          if (foundShebang) maybeOffset - 2
-          else maybeOffset
+          if (foundShebang) lastOffset - 2
+          else lastOffset
       }
     } else lastOffset
   }
