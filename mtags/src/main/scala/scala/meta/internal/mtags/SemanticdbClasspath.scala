@@ -36,7 +36,10 @@ final case class SemanticdbClasspath(
     ??? // loader.resolve(resourcePath(scalaOrJavaPath).toNIO).map(AbsolutePath.apply)
   }
 
-  def textDocument(scalaOrJavaPath: SourcePath): TextDocumentLookup = {
+  def textDocument(
+      scalaOrJavaPath: SourcePath,
+      module: GlobalSymbolIndex.Module
+  ): TextDocumentLookup = {
     Semanticdbs.loadTextDocument(
       scalaOrJavaPath,
       sourceroot,

@@ -17,9 +17,15 @@ import scala.meta.internal.{semanticdb => s}
 import scala.meta.io.RelativePath
 
 trait Semanticdbs {
-  def textDocument(path: SourcePath): TextDocumentLookup
-  final def textDocument(path: AbsolutePath): TextDocumentLookup =
-    textDocument(SourcePath.Standard(path.toNIO))
+  def textDocument(
+      path: SourcePath,
+      module: GlobalSymbolIndex.Module
+  ): TextDocumentLookup
+  final def textDocument(
+      path: AbsolutePath,
+      module: GlobalSymbolIndex.Module
+  ): TextDocumentLookup =
+    textDocument(SourcePath.Standard(path.toNIO), module)
 }
 object Semanticdbs {
   def loadTextDocuments(path: AbsolutePath): s.TextDocuments = {
