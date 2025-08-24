@@ -176,7 +176,7 @@ final class OnDemandSymbolIndex(
 object OnDemandSymbolIndex {
 
   def empty(
-      onError: PartialFunction[Throwable, Unit] = { case NonFatal(e) =>
+      onError: PartialFunction[Throwable, Unit] = { case e: Throwable =>
         throw e
       },
       mtags: () => Mtags = () => Mtags.testingSingleton,
