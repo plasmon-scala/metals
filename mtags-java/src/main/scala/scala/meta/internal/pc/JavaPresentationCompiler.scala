@@ -25,6 +25,7 @@ import scala.meta.pc.ReferencesRequest
 import scala.meta.pc.ReferencesResult
 import scala.meta.pc.SymbolSearch
 import scala.meta.pc.VirtualFileParams
+import scala.meta.pc.CompileResult
 
 import org.eclipse.lsp4j
 import org.eclipse.lsp4j.CompletionItem
@@ -79,6 +80,12 @@ case class JavaPresentationCompiler(
           .orNull
       )
     )
+
+  override def compile(
+      params: VirtualFileParams
+  ): CompletableFuture[CompileResult] = {
+    ???
+  }
 
   override def rename(
       params: OffsetParams,
