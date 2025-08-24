@@ -57,6 +57,9 @@ import org.eclipse.lsp4j.SignatureHelp
 import org.eclipse.lsp4j.TextEdit
 
 class ScalaPresentationCompiler(
+    userLoggerSupplier: java.util.function.Supplier[
+      java.util.function.Consumer[String]
+    ],
     var buildTargetIdentifier: String = "",
     var buildTargetName: Option[String] = None,
     var classpath: Seq[Path] = Nil,
@@ -80,6 +83,8 @@ class ScalaPresentationCompiler(
 
   val logger: Logger =
     Logger.getLogger(classOf[ScalaPresentationCompiler].getName)
+
+  private val userLogger = userLoggerSupplier.get()
 
   override def withBuildTargetName(
       buildTargetName: String
@@ -161,7 +166,8 @@ class ScalaPresentationCompiler(
     new ScalaCompilerAccess(
       config,
       sh,
-      () => new ScalaCompilerWrapper(newCompiler())
+      () => new ScalaCompilerWrapper(newCompiler()),
+      userLogger
     )(ec)
 
   override def shutdown(): Unit = {
@@ -669,12 +675,31 @@ class ScalaPresentationCompiler(
     }
     val (isSuccess, unprocessed) =
       settings.processArguments(options, processAll = true)
-    if (unprocessed.nonEmpty || !isSuccess) {
-      logger.warning(s"Unknown compiler options: ${unprocessed.mkString(", ")}")
-    }
+    userLogger.accept(
+      s"Creating new interactive compiler for Scala ${BuildInfo.scalaCompilerVersion}"
+    )
+    userLogger.accept(s"Build target: $buildTargetIdentifier")
+    if (unprocessed.nonEmpty || !isSuccess)
+      userLogger.accept(
+        s"Warning: unknown compiler options: ${unprocessed.mkString(", ")}"
+      )
+    userLogger.accept(s"Settings: ${settings.toConciseString}")
+    userLogger.accept("Class path:")
+    for (file <- this.classpath)
+      userLogger.accept(s"  $file")
     new MetalsGlobal(
+      userLogger,
       settings,
-      new StoreReporter,
+      new StoreReporter {
+        override def doReport(
+            pos: scala.reflect.internal.util.Position,
+            msg: String,
+            severity: Severity
+        ): Unit = {
+          userLogger.accept(s"$severity [$pos] $msg")
+          super.doReport(pos, msg, severity)
+        }
+      },
       search,
       buildTargetIdentifier,
       config,

@@ -35,7 +35,8 @@ import com.sun.source.util.Trees
 class JavaHoverProvider(
     compiler: JavaMetalsGlobal,
     params: OffsetParams,
-    contentType: ContentType
+    contentType: ContentType,
+    logger: java.util.function.Consumer[String]
 ) {
 
   def hover(): Option[HoverSignature] = params match {
@@ -202,7 +203,8 @@ class JavaHoverProvider(
             }
           }
         },
-        contentType
+        contentType,
+        logger
       )
       .toScala
       .map(_.docstring())
