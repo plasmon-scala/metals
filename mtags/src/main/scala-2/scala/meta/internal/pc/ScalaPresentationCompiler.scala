@@ -75,22 +75,23 @@ import org.eclipse.lsp4j.TextEdit
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
-case class ScalaPresentationCompiler(
-    buildTargetIdentifier: String = "",
-    buildTargetName: Option[String] = None,
-    classpath: Seq[Path] = Nil,
-    options: List[String] = Nil,
-    search: SymbolSearch = EmptySymbolSearch,
-    ec: ExecutionContextExecutor = ExecutionContext.global,
-    sh: Option[ScheduledExecutorService] = None,
-    config: PresentationCompilerConfig = PresentationCompilerConfigImpl(),
-    logger: Logger = LoggerFactory.getLogger("mtags"),
-    folderPath: Option[Path] = None,
-    reportsLevel: ReportLevel = ReportLevel.Info,
-    completionItemPriority: CompletionItemPriority = (_: String) => 0,
-    sourcePath: ju.function.Supplier[ju.List[Path]] = () => Nil.asJava,
-    semanticdbFileManager: SemanticdbFileManager = SemanticdbFileManager.EMPTY,
-    optReportContext: Option[ReportContext] = None
+class ScalaPresentationCompiler(
+    var buildTargetIdentifier: String = "",
+    var buildTargetName: Option[String] = None,
+    var classpath: Seq[Path] = Nil,
+    var options: List[String] = Nil,
+    var search: SymbolSearch = EmptySymbolSearch,
+    var ec: ExecutionContextExecutor = ExecutionContext.global,
+    var sh: Option[ScheduledExecutorService] = None,
+    var config: PresentationCompilerConfig = PresentationCompilerConfigImpl(),
+    var logger: Logger = LoggerFactory.getLogger("mtags"),
+    var folderPath: Option[Path] = None,
+    var reportsLevel: ReportLevel = ReportLevel.Info,
+    var completionItemPriority: CompletionItemPriority = (_: String) => 0,
+    var sourcePath: ju.function.Supplier[ju.List[Path]] = () => Nil.asJava,
+    var semanticdbFileManager: SemanticdbFileManager =
+      SemanticdbFileManager.EMPTY,
+    var optReportContext: Option[ReportContext] = None
 ) extends PresentationCompiler
     with HasCompilerAccess {
 
@@ -103,50 +104,72 @@ case class ScalaPresentationCompiler(
 
   override def withBuildTargetName(
       buildTargetName: String
-  ): ScalaPresentationCompiler =
-    copy(buildTargetName = Some(buildTargetName))
+  ): this.type = {
+    this.buildTargetName = Some(buildTargetName)
+    this
+  }
 
-  override def withReportsLoggerLevel(level: String): PresentationCompiler =
-    copy(reportsLevel = ReportLevel.fromString(level))
+  override def withReportsLoggerLevel(level: String): this.type = {
+    this.reportsLevel = ReportLevel.fromString(level)
+    this
+  }
 
-  override def withSearch(search: SymbolSearch): PresentationCompiler =
-    copy(search = search)
+  override def withSearch(search: SymbolSearch): this.type = {
+    this.search = search
+    this
+  }
 
-  override def withWorkspace(workspace: Path): PresentationCompiler =
-    copy(folderPath = Some(workspace))
+  override def withWorkspace(workspace: Path): this.type = {
+    this.folderPath = Some(workspace)
+    this
+  }
 
   override def withExecutorService(
       executorService: ExecutorService
-  ): PresentationCompiler =
-    copy(ec = ExecutionContext.fromExecutorService(executorService))
+  ): this.type = {
+    this.ec = ExecutionContext.fromExecutorService(executorService)
+    this
+  }
 
   override def withScheduledExecutorService(
       sh: ScheduledExecutorService
-  ): PresentationCompiler =
-    copy(sh = Some(sh))
+  ): this.type = {
+    this.sh = Some(sh)
+    this
+  }
 
   override def withConfiguration(
       config: PresentationCompilerConfig
-  ): PresentationCompiler =
-    copy(config = config)
+  ): this.type = {
+    this.config = config
+    this
+  }
 
-  override def withLogger(logger: Logger): PresentationCompiler =
-    copy(logger = logger)
+  override def withLogger(logger: Logger): this.type = {
+    this.logger = logger
+    this
+  }
 
   override def withCompletionItemPriority(
       priority: CompletionItemPriority
-  ): PresentationCompiler =
-    copy(completionItemPriority = priority)
+  ): this.type = {
+    this.completionItemPriority = priority
+    this
+  }
 
   override def withSemanticdbFileManager(
       semanticdbFileManager: SemanticdbFileManager
-  ): PresentationCompiler =
-    copy(semanticdbFileManager = semanticdbFileManager)
+  ): this.type = {
+    this.semanticdbFileManager = semanticdbFileManager
+    this
+  }
 
   override def withReportContext(
       reportContext: ReportContext
-  ): PresentationCompiler =
-    copy(optReportContext = Some(reportContext))
+  ): this.type = {
+    this.optReportContext = Some(reportContext)
+    this
+  }
 
   override def supportedCodeActions(): util.List[String] = List(
     CodeActionId.ConvertToNamedArguments,
@@ -257,7 +280,7 @@ case class ScalaPresentationCompiler(
       buildTargetIdentifier: String,
       classpath: util.List[Path],
       options: util.List[String]
-  ): PresentationCompiler =
+  ): this.type =
     newInstance(
       buildTargetIdentifier,
       classpath,
@@ -270,13 +293,12 @@ case class ScalaPresentationCompiler(
       classpath: util.List[Path],
       options: util.List[String],
       sourcePath: ju.function.Supplier[ju.List[Path]]
-  ): PresentationCompiler = {
-    copy(
-      buildTargetIdentifier = buildTargetIdentifier,
-      classpath = classpath.asScala,
-      options = options.asScala.toList,
-      sourcePath = sourcePath
-    )
+  ): this.type = {
+    this.buildTargetIdentifier = buildTargetIdentifier
+    this.classpath = classpath.asScala
+    this.options = options.asScala.toList
+    this.sourcePath = sourcePath
+    this
   }
 
   override def didChange(
