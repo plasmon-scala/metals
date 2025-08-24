@@ -828,7 +828,7 @@ object ScaladocParser {
         val peek: String = buffer.substring(offset)
         val limit = 60
         val limitedPeek = peek.substring(0, limit min peek.length)
-        println(s"peek: $tag: '$limitedPeek'")
+        System.err.println(s"peek: $tag: '$limitedPeek'")
       }
 
       /* Accumulated state */
