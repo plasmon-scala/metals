@@ -63,14 +63,16 @@ object SourcePath {
     def uri: String =
       "jar:" + zipPath.toUri.toASCIIString + "!/" + pathInZip
     def filePath: Option[Path] = None
-    def content(
-        charSet: Charset
-    )(implicit context: SourcePath.Context): String = {
+    def content(charSet: Charset)(implicit
+        context: SourcePath.Context
+    ): String =
+      new String(rawContent(), charSet)
+    def rawContent()(implicit context: SourcePath.Context): Array[Byte] = {
       val zf = context.get(zipPath)
       val ent = zf.getEntry(pathInZip)
       if (ent == null)
         throw new FileNotFoundException(uri)
-      new String(zf.getInputStream(ent).readAllBytes(), charSet)
+      zf.getInputStream(ent).readAllBytes()
     }
     def exists()(implicit context: SourcePath.Context): Boolean =
       Files.exists(zipPath) && context.get(zipPath).getEntry(pathInZip) != null
