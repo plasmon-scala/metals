@@ -1,5 +1,6 @@
 package scala.meta.internal.metals
 
+import java.nio.file.Path
 import java.util.Optional
 
 import scala.collection.concurrent.TrieMap
@@ -207,9 +208,9 @@ class Docstrings(index: GlobalSymbolIndex, mtags: () => Mtags) {
 }
 
 object Docstrings {
-  def empty(mtags: () => Mtags): Docstrings =
+  def empty(javaHome: Path, mtags: () => Mtags): Docstrings =
     new Docstrings(
-      OnDemandSymbolIndex.empty(mtags = mtags),
+      OnDemandSymbolIndex.empty(javaHome, mtags = mtags),
       mtags
     )
 }

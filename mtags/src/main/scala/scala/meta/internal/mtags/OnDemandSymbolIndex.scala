@@ -1,5 +1,6 @@
 package scala.meta.internal.mtags
 
+import java.nio.file.Path
 import java.util.zip.ZipError
 import java.util.zip.ZipException
 
@@ -29,6 +30,7 @@ final class OnDemandSymbolIndex(
     toIndexSource: AbsolutePath => AbsolutePath,
     isClasspathDefinitionIndexEnabled: () => Boolean,
     val mtags: () => Mtags,
+    javaHome: Path,
     dialectBuckets: TrieMap[Dialect, SymbolIndexBucket] = TrieMap.empty
 ) extends GlobalSymbolIndex {
   var indexedSources = 0L
@@ -45,7 +47,8 @@ final class OnDemandSymbolIndex(
         isClasspathDefinitionIndexEnabled = isClasspathDefinitionIndexEnabled,
         dialect = dialect,
         toIndexSource = toIndexSource,
-        onError = onError
+        onError = onError,
+        javaHome = javaHome
       )
     )
 
@@ -176,6 +179,7 @@ final class OnDemandSymbolIndex(
 object OnDemandSymbolIndex {
 
   def empty(
+      javaHome: Path,
       onError: PartialFunction[Throwable, Unit] = { case e: Throwable =>
         throw e
       },
@@ -187,7 +191,8 @@ object OnDemandSymbolIndex {
       onError,
       toIndexSource,
       isClasspathDefinitionIndexEnabled,
-      mtags = mtags
+      mtags = mtags,
+      javaHome = javaHome
     )
   }
 
