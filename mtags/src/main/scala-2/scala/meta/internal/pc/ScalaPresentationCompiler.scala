@@ -29,6 +29,7 @@ import scala.meta.pc.AutoImportsResult
 import scala.meta.pc.CodeActionId
 import scala.meta.pc.CompileResult
 import scala.meta.pc.CompletionItemPriority
+import scala.meta.pc.ContentType
 import scala.meta.pc.DefinitionResult
 import scala.meta.pc.DisplayableException
 import scala.meta.pc.HoverSignature
@@ -70,7 +71,8 @@ class ScalaPresentationCompiler(
     var search: SymbolSearch = EmptySymbolSearch,
     var ec: ExecutionContextExecutor = ExecutionContext.global,
     var sh: Option[ScheduledExecutorService] = None,
-    var config: PresentationCompilerConfig = PresentationCompilerConfigImpl(),
+    var config: PresentationCompilerConfig =
+      PresentationCompilerConfigImpl(hoverContentType = ContentType.MARKDOWN),
     var folderPath: Option[Path] = None,
     var reportsLevel: ReportLevel = ReportLevel.Info,
     var completionItemPriority: CompletionItemPriority = (_: String) => 0,
