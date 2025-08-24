@@ -171,6 +171,9 @@ class ScalaPresentationCompiler(
       userLogger
     )(ec)
 
+  def latestException(): Option[(Option[String], Throwable)] =
+    compilerAccess.latestException()
+
   override def shutdown(): Unit = {
     compilerAccess.shutdown()
   }
@@ -211,7 +214,8 @@ class ScalaPresentationCompiler(
   def didClose(uri: URI): Unit = {
     compilerAccess.withNonInterruptableCompiler(
       (),
-      EmptyCancelToken
+      EmptyCancelToken,
+      uri.toASCIIString
     ) { pc =>
       pc.compiler().richCompilationCache.remove(uri.toString())
     }(emptyQueryContext)
@@ -347,7 +351,8 @@ class ScalaPresentationCompiler(
     compilerAccess
       .withInterruptableCompiler(
         empty,
-        params.token
+        params.token,
+        params.uri.toASCIIString
       ) { pc =>
         new InferredMethodProvider(pc.compiler(), params)
           .inferredMethodEdits()
@@ -389,7 +394,8 @@ class ScalaPresentationCompiler(
     compilerAccess.withInterruptableCompiler(
       empty,
       range.token,
-      s"extractMethod(${range.uri})"
+      s"extractMethod(${range.uri})",
+      range.uri.toASCIIString
     ) { pc =>
       new ExtractMethodProvider(
         pc.compiler(range),
@@ -466,7 +472,7 @@ class ScalaPresentationCompiler(
       symbol: String
   ): CompletableFuture[CompletionItem] =
     CompletableFuture.completedFuture {
-      compilerAccess.withSharedCompiler(item) { pc =>
+      compilerAccess.withSharedCompiler(item, "") { pc =>
         new CompletionItemResolver(pc.compiler()).resolve(item, symbol)
       }(emptyQueryContext)
     }
@@ -610,7 +616,8 @@ class ScalaPresentationCompiler(
   ): CompletableFuture[ju.List[ReferencesResult]] = {
     compilerAccess.withInterruptableCompiler(
       List.empty[ReferencesResult].asJava,
-      params.file.token()
+      params.file.token(),
+      params.file.uri.toASCIIString
     ) { pc =>
       val res: List[ReferencesResult] =
         PcReferencesProvider(pc.compiler(), params).references()
@@ -649,7 +656,8 @@ class ScalaPresentationCompiler(
   ): CompletableFuture[ju.List[SelectionRange]] = {
     CompletableFuture.completedFuture {
       compilerAccess.withSharedCompiler(
-        List.empty[SelectionRange].asJava
+        List.empty[SelectionRange].asJava,
+        params.asScala.headOption.map(_.uri().toASCIIString()).getOrElse("")
       ) { pc =>
         new SelectionRangeProvider(pc.compiler(), params)
           .selectionRange()
