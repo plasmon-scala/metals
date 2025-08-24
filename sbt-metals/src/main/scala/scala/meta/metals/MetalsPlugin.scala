@@ -150,10 +150,7 @@ object MetalsPlugin extends AutoPlugin {
     }
   }
 
-  case class JdkVersion(major: Int) {
-
-    def hasJigsaw: Boolean = major >= 9
-  }
+  case class JdkVersion(major: Int)
 
   object JdkVersion {
 
