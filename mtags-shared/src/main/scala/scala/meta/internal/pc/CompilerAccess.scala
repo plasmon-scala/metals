@@ -24,7 +24,7 @@ import scala.meta.pc.PresentationCompilerConfig
  * - handles cancellation via `Thread.interrupt()` to stop the compiler during typechecking,
  *   for functions that support cancellation.
  */
-abstract class CompilerAccess[Reporter, Compiler](
+abstract class CompilerAccess[+Reporter, Compiler](
     config: PresentationCompilerConfig,
     sh: Option[ScheduledExecutorService],
     newCompiler: () => CompilerWrapper[Reporter, Compiler],
@@ -38,12 +38,14 @@ abstract class CompilerAccess[Reporter, Compiler](
     Logger.getLogger(classOf[CompilerAccess[_, _]].getName)
 
   val jobs = CompilerJobQueue()
-  private var _compiler: CompilerWrapper[Reporter, Compiler] = _
+  private var __compiler: CompilerWrapper[_, Compiler] = _
+  private def _compiler: CompilerWrapper[Reporter, Compiler] =
+    __compiler.asInstanceOf[CompilerWrapper[Reporter, Compiler]]
   private def isEmpty: Boolean = _compiler == null
   private def isDefined: Boolean = !isEmpty
   private def loadCompiler(): CompilerWrapper[Reporter, Compiler] = {
     if (_compiler == null) {
-      _compiler = newCompiler()
+      __compiler = newCompiler()
     }
     _compiler.resetReporter()
     _compiler
@@ -66,7 +68,7 @@ abstract class CompilerAccess[Reporter, Compiler](
     val compiler = _compiler
     if (compiler != null) {
       compiler.askShutdown()
-      _compiler = null
+      __compiler = null
       sh.foreach { scheduler =>
         scheduler.schedule[Unit](
           () => {
