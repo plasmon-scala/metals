@@ -2,7 +2,7 @@ package scala.meta.internal.pc
 
 import scala.meta.pc.VirtualFileParams
 
-trait CompilerWrapper[Reporter, Compiler] {
+trait CompilerWrapper[+Reporter, Compiler] {
 
   def resetReporter(): Unit
 

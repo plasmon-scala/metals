@@ -26,7 +26,7 @@ import org.slf4j.Logger
  * - handles cancellation via `Thread.interrupt()` to stop the compiler during typechecking,
  *   for functions that support cancellation.
  */
-abstract class CompilerAccess[Reporter, Compiler](
+abstract class CompilerAccess[+Reporter, Compiler](
     logger: Logger,
     config: PresentationCompilerConfig,
     sh: Option[ScheduledExecutorService],
@@ -39,7 +39,9 @@ abstract class CompilerAccess[Reporter, Compiler](
   var latestExceptionOpt: Option[(Option[String], Throwable)] = None
 
   val jobs: CompilerJobQueue = CompilerJobQueue(id)
-  private var _compiler: CompilerWrapper[Reporter, Compiler] = _
+  private var __compiler: CompilerWrapper[_, Compiler] = _
+  private def _compiler: CompilerWrapper[Reporter, Compiler] =
+    __compiler.asInstanceOf[CompilerWrapper[Reporter, Compiler]]
   private var isShutdown: Boolean = false
   private def isEmpty: Boolean = _compiler == null
   private def isDefined: Boolean = !isEmpty
@@ -49,7 +51,7 @@ abstract class CompilerAccess[Reporter, Compiler](
         throw new CancellationException()
       }
       if (_compiler == null) {
-        _compiler = newCompiler()
+        __compiler = newCompiler()
       }
       _compiler.resetReporter()
       _compiler
@@ -83,12 +85,12 @@ abstract class CompilerAccess[Reporter, Compiler](
 
   private def detachCurrentCompiler(): CompilerWrapper[Reporter, Compiler] = {
     val current = _compiler
-    _compiler = null
+    __compiler = null
     current
   }
 
   private def stopCompiler(
-      compiler: CompilerWrapper[Reporter, Compiler]
+      compiler: CompilerWrapper[_, Compiler]
   ): Unit = {
     if (compiler != null) {
       compiler.stop()
