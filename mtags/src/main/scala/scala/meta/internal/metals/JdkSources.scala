@@ -58,7 +58,8 @@ object JdkSources {
       } match {
         case Failure(exception) =>
           logger.warn(
-            s"Failed to parse java home path $str: ${exception.getMessage}"
+            s"Failed to parse java home path $str",
+            exception
           )
           None
         case Success(value) => Some(value)
