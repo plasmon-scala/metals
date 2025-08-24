@@ -26,6 +26,7 @@ import scala.meta.pc.ContentType.PLAINTEXT
 import scala.meta.pc.ParentSymbols
 import scala.meta.pc.SymbolDocumentation
 import scala.meta.pc.reports.ReportContext
+import java.nio.file.Path
 
 /**
  * Implementation of the `documentation(symbol: String): Option[SymbolDocumentation]` method in `SymbolSearch`.
@@ -199,9 +200,10 @@ class Docstrings(index: GlobalSymbolIndex)(implicit rc: ReportContext) {
 }
 
 object Docstrings {
-  def empty(implicit rc: ReportContext): Docstrings = new Docstrings(
-    OnDemandSymbolIndex.empty()
-  )
+  def empty(javaHome: Path)(implicit rc: ReportContext): Docstrings =
+    new Docstrings(
+      OnDemandSymbolIndex.empty(javaHome)
+    )
 }
 
 sealed trait Content extends Any

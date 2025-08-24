@@ -127,8 +127,6 @@ case class ScalaPresentationCompiler(
     CodeActionId.InsertInferredMethod
   ).asJava
 
-  def this() = this(buildTargetIdentifier = "")
-
   def additionalReportData(): String =
     s"""|Scala version: $scalaVersion
         |Classpath:
