@@ -239,12 +239,19 @@ trait ScalametaCommonEnrichments extends CommonMtagsEnrichments {
         Paths.get(uri).filename
       } match {
         case Failure(exception) =>
-          logger.warning(exception.getMessage())
+          scribe.warn(
+            s"Error getting filename of ${input.path} via a URI",
+            exception
+          )
           Try {
             Paths.get(input.path).filename
           } match {
             case Failure(exception) =>
               logger.warning(exception.getMessage())
+              scribe.warn(
+                s"Error getting filename of ${input.path} via a URI and a NIO path",
+                exception
+              )
               input.path.reverse.takeWhile(c => c != '/' && c != '\\').reverse
             case Success(value) =>
               value
