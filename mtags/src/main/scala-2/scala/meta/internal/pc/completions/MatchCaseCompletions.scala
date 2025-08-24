@@ -162,14 +162,22 @@ trait MatchCaseCompletions { this: MetalsGlobal =>
         // Step 1: walk through scope members.
         metalsScopeMembers(pos).iterator
           .foreach { m =>
-            val sym = m.sym.dealiased
-            val fsym = sym.dealiasedSingleType
-            val isValid = !parents.isParent(fsym) &&
-              (fsym.isCase ||
-                fsym.hasModuleFlag ||
-                fsym.isInstanceOf[TypeSymbol]) &&
-              parents.isSubClass(fsym, includeReverse = false)
-            if (isValid) visit(sym)
+            try {
+              val sym = m.sym.dealiased
+              val fsym = sym.dealiasedSingleType
+              val isValid = !parents.isParent(fsym) &&
+                (fsym.isCase ||
+                  fsym.hasModuleFlag ||
+                  fsym.isInstanceOf[TypeSymbol]) &&
+                parents.isSubClass(fsym, includeReverse = false)
+              if (isValid) visit(sym)
+            } catch {
+              case e: TypeError =>
+                scribe.warn(
+                  "Ignoring scope member for completion that throws",
+                  e
+                )
+            }
           }
 
         // Step 2: walk through known direct subclasses of sealed types.

@@ -557,7 +557,41 @@ class CompletionProvider(
       }
       val isTypeMember = kind == CompletionListKind.Type
       params.checkCanceled()
-      val matchingResults = completions.matchingResults { entered => name =>
+      val completions0 = completions match {
+        case m: CompletionResult.ScopeMembers =>
+          m.copy(results = m.results.filter { m =>
+            try {
+              m.sym.dealiased.info
+              m.sym.info
+              m.sym.exists
+            } catch {
+              case e: TypeError =>
+                scribe.warn(
+                  "Ignoring completion symbol that throws on call to exists",
+                  e
+                )
+                false
+            }
+          })
+        case m: CompletionResult.TypeMembers =>
+          m.copy(results = m.results.filter { m =>
+            try {
+              m.sym.dealiased.info
+              m.sym.info
+              m.sym.exists
+            } catch {
+              case e: TypeError =>
+                scribe.warn(
+                  "Ignoring completion symbol that throws on call to exists",
+                  e
+                )
+                false
+            }
+          })
+        case _ =>
+          completions
+      }
+      val matchingResults = completions0.matchingResults { entered => name =>
         if (isTypeMember) CompletionFuzzy.matchesSubCharacters(entered, name)
         else CompletionFuzzy.matches(entered, name)
       }
@@ -568,10 +602,10 @@ class CompletionProvider(
         source,
         params.text(),
         editRange,
-        completions,
+        completions0,
         latestParentTrees
       )
-      val query = completions.name.toString
+      val query = completions0.name.toString
       val items = filterInteresting(
         matchingResults,
         kind,
