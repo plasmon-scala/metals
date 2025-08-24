@@ -156,7 +156,7 @@ final class OnDemandSymbolIndex(
 object OnDemandSymbolIndex {
 
   def empty(
-      onError: PartialFunction[Throwable, Unit] = { case NonFatal(e) =>
+      onError: PartialFunction[Throwable, Unit] = { case e: Throwable =>
         throw e
       },
       toIndexSource: AbsolutePath => AbsolutePath = identity
