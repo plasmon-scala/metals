@@ -1,15 +1,9 @@
 package scala.meta.internal.metals
 
-import java.io.UncheckedIOException
-
-import scala.collection.concurrent.TrieMap
-
 import scala.meta.Dialect
 import scala.meta.dialects._
-import scala.meta.internal.io.FileIO
-import scala.meta.internal.metals.MetalsEnrichments._
+import scala.meta.internal.mtags.BuildInfo
 import scala.meta.internal.semver.SemVer
-import scala.meta.io.AbsolutePath
 
 class ScalaVersions(
     deprecatedScalaVersions: Seq[String],
@@ -17,10 +11,8 @@ class ScalaVersions(
     supportedScalaBinaryVersions: Seq[String],
     scala212: String,
     scala213: String,
-    scala3: String,
+    scala3: String
 ) {
-
-  private val jarScalaVersionIndex = TrieMap[String, String]()
 
   def isScala3Milestone(version: String): Boolean =
     version.startsWith("3.0.0-M") || version.startsWith("3.0.0-RC")
@@ -130,7 +122,7 @@ class ScalaVersions(
    */
   def dialectForScalaVersion(
       scalaVersion: String,
-      includeSource3: Boolean,
+      includeSource3: Boolean
   ): Dialect = {
     val scalaBinaryVersion = scalaBinaryVersionFromFullVersion(scalaVersion)
     scalaBinaryVersion match {
@@ -146,7 +138,7 @@ class ScalaVersions(
 
   def fmtDialectForScalaVersion(
       scalaVersion: String,
-      includeSource3: Boolean,
+      includeSource3: Boolean
   ): ScalafmtDialect = {
     scalaBinaryVersionFromFullVersion(scalaVersion) match {
       case "3" => ScalafmtDialect.Scala3
@@ -190,48 +182,6 @@ class ScalaVersions(
       .headOption
       .map(scalaBinaryVersionFromFullVersion)
   }
-
-  def dialectForDependencyJar(
-      jar: AbsolutePath,
-      buildTargets: BuildTargets,
-  ): Dialect = {
-    lazy val buildTargetAndScalaVersion =
-      buildTargets
-        .inverseDependencySource(jar)
-        .flatMap(id => buildTargets.scalaTarget(id))
-        .map(target => (target.scalaBinaryVersion, target.id))
-        .toList
-        .sortBy(_._1)
-        .headOption
-
-    def fromTastyExistance = {
-      val fromTasty = buildTargetAndScalaVersion
-        .flatMap { case (_, id) => buildTargets.findJarFor(id, jar) }
-        .flatMap(
-          FileIO.withJarFileSystem(_, create = false) { root =>
-            try {
-              root.listRecursive
-                .find(f => f.isFile && f.filename.endsWith(".tasty"))
-                .map(_ => "3")
-                .orElse(Some("2.13"))
-            } catch {
-              case _: UncheckedIOException => None
-            }
-          }
-        )
-      fromTasty.foreach(jarScalaVersionIndex.put(jar.toURI.toString(), _))
-      fromTasty
-    }
-
-    val scalaVersion =
-      scalaBinaryVersionFromJarName(jar.toNIO.getFileName().toString())
-        .orElse(jarScalaVersionIndex.get(jar.toURI.toString()))
-        .orElse(fromTastyExistance)
-        .orElse(buildTargetAndScalaVersion.map(_._1))
-        .getOrElse("2.13")
-    dialectForScalaVersion(scalaVersion, includeSource3 = true)
-  }
-
 }
 
 object ScalaVersions
@@ -241,5 +191,5 @@ object ScalaVersions
       BuildInfo.supportedScalaBinaryVersions,
       BuildInfo.scala212,
       BuildInfo.scala213,
-      BuildInfo.scala3,
+      BuildInfo.scala3
     )
