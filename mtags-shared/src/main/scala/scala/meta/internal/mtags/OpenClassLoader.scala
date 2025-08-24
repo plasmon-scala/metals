@@ -45,11 +45,11 @@ final class OpenClassLoader {
   private def resolve0(uri: String): Iterator[Path] =
     map.iterator
       .flatMap { case (entry, root) =>
-        val (root0, f, exists) =
+        val (f, exists) =
           try {
             val f0 = root.resolve(uri)
             val exists0 = Files.exists(f0)
-            (root, f0, exists0)
+            (f0, exists0)
           } catch {
             case _: java.nio.file.ClosedFileSystemException =>
               // throw new Exception(s"Error accessing ${f.getFileSystem}", ex)
@@ -59,7 +59,7 @@ final class OpenClassLoader {
               map += entry -> root0
               val f0 = root0.resolve(uri)
               val exists0 = Files.exists(f0)
-              (root0, f0, exists0)
+              (f0, exists0)
           }
         if (exists) Iterator(f)
         else Iterator.empty
@@ -76,5 +76,8 @@ final class OpenClassLoader {
 
   def loadClassSafe(symbol: String): Option[Class[_]] =
     None
+
+  def list(): Seq[Path] =
+    map.keysIterator.toVector
 
 }
