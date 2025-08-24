@@ -205,6 +205,8 @@ abstract class CompilerAccess[Reporter, Compiler](
       thunk: CompilerWrapper[Reporter, Compiler] => T
   )(implicit queryInfo: PcQueryContext): T = {
     try {
+      // if (params.exists(_.text().contains("$make" + " it crash$")))
+      //   throw new Exception("$make" + " it crash$")
       val compiler =
         try Right(loadCompiler())
         catch { case _: CancellationException => Left(default) }
