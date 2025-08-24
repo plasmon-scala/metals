@@ -63,11 +63,11 @@ inThisBuild(
     dynverSeparator := "-",
     scalaVersion := V.scala213,
     crossScalaVersions := List(V.scala213),
-    organization := "org.scalameta",
+    organization := "io.github.plasmon-scala",
     licenses := Seq(
       "Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0")
     ),
-    homepage := Some(url("https://github.com/scalameta/metals")),
+    homepage := Some(url("https://github.com/plasmon-scala/metals")),
     developers := metalsDevs,
     testFrameworks := List(),
     // Sonatype OSSRH was sunset on 2025-06-30, use Central Portal
@@ -657,6 +657,7 @@ lazy val `gradle-extractor` = project
 lazy val metals = project
   .settings(scala213OnlyScalafix)
   .settings(
+    publish / skip := true,
     sharedSettings,
     Compile / run / fork := true,
     Compile / run / javaOptions ++= sharedJavaOptions,
@@ -800,6 +801,7 @@ lazy val `metals-mcp` = project
   .settings(scala213OnlyScalafix)
   .in(file("metals-mcp"))
   .settings(
+    publish / skip := true,
     sharedSettings,
     moduleName := "metals-mcp",
     Compile / mainClass := Some("scala.meta.metals.McpMain"),
@@ -809,6 +811,7 @@ lazy val `metals-mcp` = project
 
 lazy val `sbt-metals` = project
   .settings(
+    publish / skip := true,
     buildInfoPackage := "scala.meta.internal.sbtmetals",
     buildInfoKeys := Seq[BuildInfoKey](
       "semanticdbVersion" -> V.semanticdb(scalaVersion.value),
