@@ -53,7 +53,7 @@ class SymbolIndexBucket(
   private val classpathDefinitionIndex =
     new ClasspathDefinitionIndex(mtags, dialect)
 
-  def close(): Unit = sourceJars.close()
+  def close(): Unit = () // sourceJars.close()
 
   def addSourceDirectory(
       dir: AbsolutePath

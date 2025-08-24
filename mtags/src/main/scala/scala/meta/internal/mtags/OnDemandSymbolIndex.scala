@@ -34,6 +34,7 @@ final class OnDemandSymbolIndex(
     javaHome: Path,
     dialectBuckets: TrieMap[Dialect, SymbolIndexBucket] = TrieMap.empty
 ) extends GlobalSymbolIndex {
+  // private lazy val sourceJars0 = sourceJars()
   var indexedSources = 0L
   def close(): Unit = {
     dialectBuckets.values.foreach(_.close())
