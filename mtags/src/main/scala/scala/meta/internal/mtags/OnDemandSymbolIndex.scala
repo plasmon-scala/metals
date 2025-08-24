@@ -41,11 +41,11 @@ final class OnDemandSymbolIndex(
     sourceJars: () => OpenClassLoader,
     toIndexSource: AbsolutePath => AbsolutePath,
     javaHome: Path,
-    onNewBucket: (SymbolIndexBucket, Dialect, GlobalSymbolIndex.Module) => Unit
+    onNewBucket: (SymbolIndexBucket, Dialect, GlobalSymbolIndex.Module) => Unit,
+    val mtags: Mtags
 )(implicit rc: ReportContext)
     extends GlobalSymbolIndex {
   // private lazy val sourceJars0 = sourceJars()
-  val mtags = new Mtags
   var indexedSources = 0L
   def close(): Unit = {
     dialectBuckets.values.foreach(_.close())
@@ -283,6 +283,7 @@ object OnDemandSymbolIndex {
 
   def empty(
       javaHome: Path,
+      mtags: Mtags,
       onError: PartialFunction[Throwable, Unit] = { case e: Throwable =>
         throw e
       },
@@ -300,7 +301,8 @@ object OnDemandSymbolIndex {
       sourceJars,
       toIndexSource,
       javaHome,
-      onNewBucket
+      onNewBucket,
+      mtags
     )
   }
 
