@@ -35,7 +35,7 @@ object V {
   val mill = "1.0.3"
   val mdoc = "2.7.2"
   val munit = "1.1.1"
-  val pprint = "0.7.3"
+  val pprint = "0.8.1"
   val sbtBloop = bloop
   val sbtJdiTools = "1.2.0"
   val scalaCli = "1.8.5"

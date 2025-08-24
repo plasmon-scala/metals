@@ -472,6 +472,8 @@ class SymbolIndexBucket(
     }
   } catch {
     case NonFatal(e) =>
+      // pprint.err.log("Error indexing " + input.path)
+      // e.printStackTrace(System.err)
       // logger.log(Level.WARNING, s"Error indexing ${input.path}", e)
       scribe.error(s"Error indexing ${input.path}", e)
       if (retry) addMtagsSourceFile(originOpt, input, retry = false)
