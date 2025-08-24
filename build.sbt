@@ -183,15 +183,6 @@ def lintingOptions(scalaVersion: String) = {
   )
 }
 
-val sharedJavacOptions = List(
-  Compile / javacOptions ++= {
-    if (sys.props("java.version").startsWith("17"))
-      Nil
-    else
-      Seq("--release", "17")
-  }
-)
-
 val sharedScalacOptions = List(
   scalacOptions ++= {
     CrossVersion.partialVersion(scalaVersion.value) match {
@@ -208,7 +199,7 @@ val sharedScalacOptions = List(
   }
 )
 
-val sharedSettings = sharedJavacOptions ++ sharedScalacOptions ++ List(
+val sharedSettings = sharedScalacOptions ++ List(
   Compile / doc / sources := Seq.empty,
   libraryDependencies ++= crossSetting(
     scalaVersion.value,
