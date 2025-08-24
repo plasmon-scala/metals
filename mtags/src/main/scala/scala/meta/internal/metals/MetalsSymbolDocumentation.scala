@@ -17,4 +17,6 @@ case class MetalsSymbolDocumentation(
 object MetalsSymbolDocumentation {
   def empty(symbol: String): MetalsSymbolDocumentation =
     MetalsSymbolDocumentation(symbol, "", "")
+  def ongoing(symbol: String): MetalsSymbolDocumentation =
+    MetalsSymbolDocumentation(symbol, "", "...")
 }
