@@ -3,6 +3,7 @@ package scala.meta.internal.pc
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
 import java.nio.charset.StandardCharsets
+import java.util.UUID
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
@@ -83,12 +84,12 @@ abstract class CompilerAccess[+Reporter, Compiler](
     }
   }
 
-  private var beforeAccess0 = Option.empty[(String, String) => Unit]
-  private var afterAccess0 = Option.empty[(String, String) => Unit]
-  def beforeAccess(f: (String, String) => Unit): Unit = {
+  private var beforeAccess0 = Option.empty[(String, String, String) => Unit]
+  private var afterAccess0 = Option.empty[(String, String, String) => Unit]
+  def beforeAccess(f: (String, String, String) => Unit): Unit = {
     beforeAccess0 = Some(f)
   }
-  def afterAccess(f: (String, String) => Unit): Unit = {
+  def afterAccess(f: (String, String, String) => Unit): Unit = {
     afterAccess0 = Some(f)
   }
 
@@ -260,9 +261,10 @@ abstract class CompilerAccess[+Reporter, Compiler](
       { () =>
         token.checkCanceled()
         Thread.interrupted() // clear interrupt bit
-        beforeAccess0.foreach(_(name, uri))
+        val id = UUID.randomUUID().toString
+        beforeAccess0.foreach(_(id, name, uri))
         try result.complete(thunk())
-        finally afterAccess0.foreach(_(name, uri))
+        finally afterAccess0.foreach(_(id, name, uri))
         ()
       }
     )
