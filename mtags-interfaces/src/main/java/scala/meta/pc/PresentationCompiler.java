@@ -36,6 +36,12 @@ public abstract class PresentationCompiler {
 	// ==============================
 
 	/**
+	 * Returns the type of the expression at the given position along with the
+	 * symbol of the referenced symbol.
+	 */
+	public abstract CompletableFuture<CompileResult> compile(VirtualFileParams params);
+
+	/**
 	 * Returns token informations from presentation compiler.
 	 *
 	 */
