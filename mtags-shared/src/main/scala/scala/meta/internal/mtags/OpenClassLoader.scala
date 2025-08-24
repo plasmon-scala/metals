@@ -12,7 +12,7 @@ import java.nio.file.FileSystem
 import java.nio.file.FileSystems
 import java.nio.file.Files
 
-final class OpenClassLoader extends AutoCloseable {
+final class OpenClassLoader {
 
   // from https://github.com/scalameta/scalameta/blob/491b8b28b6e7c3a75994bba4caf5c4b4fee526a2/scalameta/io/jvm/src/main/scala/scala/meta/internal/io/PlatformFileIO.scala#L103-L105
   private def newFileSystem(path: Path): FileSystem = {
@@ -22,10 +22,6 @@ final class OpenClassLoader extends AutoCloseable {
       case _: FileSystemAlreadyExistsException => FileSystems.getFileSystem(uri)
     }
   }
-
-  override def close(): Unit =
-    for ((_, path) <- map)
-      path.getFileSystem.close()
 
   private val isAdded = mutable.Set.empty[Path]
   private val map = mutable.ListMap.empty[Path, Path]
@@ -48,9 +44,23 @@ final class OpenClassLoader extends AutoCloseable {
 
   private def resolve0(uri: String): Iterator[Path] =
     map.iterator
-      .flatMap { case (_, root) =>
-        val f = root.resolve(uri)
-        val exists = Files.exists(f)
+      .flatMap { case (entry, root) =>
+        val (root0, f, exists) =
+          try {
+            val f0 = root.resolve(uri)
+            val exists0 = Files.exists(f0)
+            (root, f0, exists0)
+          } catch {
+            case _: java.nio.file.ClosedFileSystemException =>
+              // throw new Exception(s"Error accessing ${f.getFileSystem}", ex)
+              // Sometimes happens for the jline JAR, not sure why…
+              val fs = newFileSystem(entry)
+              val root0 = fs.getPath("/")
+              map += entry -> root0
+              val f0 = root0.resolve(uri)
+              val exists0 = Files.exists(f0)
+              (root0, f0, exists0)
+          }
         if (exists) Iterator(f)
         else Iterator.empty
       }
