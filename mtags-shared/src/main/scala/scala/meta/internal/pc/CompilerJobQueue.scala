@@ -7,6 +7,8 @@ import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import java.{util => ju}
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.ThreadFactory
 
 /**
  * A thread pool executor to execute jobs on a single thread in a last-in-first-out order.
@@ -118,6 +120,7 @@ object CompilerJobQueue {
     case object Stopped extends State
   }
 
+  private val instanceNumber = new AtomicInteger(1)
   def apply(): CompilerJobQueue = {
     new CompilerJobQueue(() => {
       val singleThreadExecutor = new ThreadPoolExecutor(
@@ -125,15 +128,26 @@ object CompilerJobQueue {
         /* maximumPoolSize */ 1,
         /* keepAliveTime */ 0,
         /* unit */ TimeUnit.MILLISECONDS,
-        /* workQueue */ new LastInFirstOutBlockingQueue
-      )
-      singleThreadExecutor.setRejectedExecutionHandler((r, _) => {
-        r match {
-          case j: Job =>
-            j.reject()
-          case _ =>
+        /* workQueue */ new LastInFirstOutBlockingQueue,
+        /* factory */ new ThreadFactory {
+          val threadNumber = new AtomicInteger(1)
+          def newThread(r: Runnable) = {
+            val t = new Thread(
+              r,
+              s"compiler-job-queue-${instanceNumber.getAndIncrement()}-" +
+                s"thread-${threadNumber.getAndIncrement()}"
+            )
+            t.setDaemon(true)
+            t.setPriority(Thread.NORM_PRIORITY)
+            t
+          }
         }
-      })
+      )
+      singleThreadExecutor.setRejectedExecutionHandler {
+        case (j: Job, _) =>
+          j.reject()
+        case _ =>
+      }
       singleThreadExecutor
     })
   }
