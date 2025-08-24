@@ -11,6 +11,7 @@ import scala.meta.Dialect
 import scala.meta.inputs.Input
 import scala.meta.internal.jdk.CollectionConverters._
 import scala.meta.internal.mtags.GlobalSymbolIndex
+import scala.meta.internal.mtags.Mtags
 import scala.meta.internal.mtags.OnDemandSymbolIndex
 import scala.meta.internal.mtags.ScalaMtags
 import scala.meta.internal.mtags.MtagsEnrichments._
@@ -297,10 +298,11 @@ class Docstrings(
 }
 
 object Docstrings {
-  def empty(javaHome: Path)(implicit rc: ReportContext): Docstrings =
-    new Docstrings(
-      OnDemandSymbolIndex.empty(javaHome)
-    )
+  def empty(javaHome: Path, mtags: Mtags)(implicit
+      rc: ReportContext
+  ): Docstrings = new Docstrings(
+    OnDemandSymbolIndex.empty(javaHome, mtags)
+  )
 }
 
 sealed trait Content extends Any
