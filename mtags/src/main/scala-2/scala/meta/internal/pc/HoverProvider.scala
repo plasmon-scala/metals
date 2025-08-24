@@ -61,9 +61,32 @@ class HoverProvider(
         if (tree.pos.isDefined) tree.pos.start
         else pos.start
 
+      val diagnostics = compiler.reporter
+        .asInstanceOf[scala.tools.nsc.reporters.StoreReporter]
+        .infos
+        .iterator
+        .map { info =>
+          new StringBuilder()
+            .append(info.pos.source.file.path)
+            .append(":")
+            .append(info.pos.column)
+            .append(" ")
+            .append(info.msg)
+            .append("\n")
+            .append(info.pos.lineContent)
+            .append("\n")
+            .append(info.pos.lineCaret)
+            .append("\n")
+            .toString
+        }
+        .filterNot(_.contains("_CURSOR_"))
+        .mkString
+
       Report(
         "empty-hover-scala2",
         s"""|pos: ${pos.toLsp}
+            |
+            |diagnostics: $diagnostics
             |
             |is error: $hasErroneousType
             |symbol: ${tree.symbol}
@@ -89,7 +112,15 @@ class HoverProvider(
       case i @ Import(_, _) =>
         for {
           member <- i.selector(pos)
-          hover <- toHover(member, pos)
+          hover <- toHover(
+            member,
+            member.keyString,
+            member.info,
+            member.info,
+            pos,
+            pos,
+            Some(report)
+          )
         } yield hover
       case _: Select | _: Apply | _: TypeApply | _: Ident =>
         val expanded = expandRangeToEnclosingApply(pos)
@@ -112,7 +143,7 @@ class HoverProvider(
             Some(report)
           )
         } else {
-          for {
+          val res = for {
             sym <- Option(tree.symbol)
             tpe <- Option(tree.tpe)
             seenFrom = seenFromType(tree, sym)
@@ -126,6 +157,9 @@ class HoverProvider(
               Some(report)
             )
           } yield hover
+          if (res.isEmpty)
+            reportContext.unsanitized().create(() => report, true)
+          res
         }
       case UnApply(fun, _) if fun.symbol != null =>
         toHover(
@@ -198,6 +232,7 @@ class HoverProvider(
           Some(report)
         )
       case _ =>
+        reportContext.unsanitized.create(() => report, true)
         // Don't show hover for non-identifiers.
         None
     }
