@@ -169,7 +169,14 @@ object CompilerJobQueue {
               r,
               s"compiler-job-queue-${instanceNumber.getAndIncrement()}-" +
                 s"thread-${threadNumber.getAndIncrement()}"
-            )
+            ) {
+              override def run(): Unit =
+                try super.run()
+                catch {
+                  case t: Throwable =>
+                    scribe.error("Compiler thread error", t)
+                }
+            }
             t.setDaemon(true)
             t.setPriority(Thread.NORM_PRIORITY)
             t
