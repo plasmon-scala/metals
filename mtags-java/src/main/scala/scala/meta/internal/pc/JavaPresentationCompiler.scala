@@ -14,6 +14,7 @@ import scala.concurrent.ExecutionContextExecutor
 import scala.jdk.CollectionConverters._
 
 import scala.meta.pc.AutoImportsResult
+import scala.meta.pc.CompileResult
 import scala.meta.pc.DefinitionResult
 import scala.meta.pc.HoverSignature
 import scala.meta.pc.InlayHintsParams
@@ -82,6 +83,12 @@ case class JavaPresentationCompiler(
           .orNull
       )
     )
+
+  override def compile(
+      params: VirtualFileParams
+  ): CompletableFuture[CompileResult] = {
+    ???
+  }
 
   override def rename(
       params: OffsetParams,
