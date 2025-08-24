@@ -140,7 +140,11 @@ class MetalsGlobal(
           throw t
       }
       typeCheckingCache.put(unit.source.file, unit.source.content)
-      userLogger.accept("Done type checking")
+      userLogger.accept(
+        s"Done type checking (PLASMON_DEBUG: ${Option(System.getenv("PLASMON_DEBUG")).contains("true")})"
+      )
+      if (Option(System.getenv("PLASMON_DEBUG")).contains("true"))
+        scribe.info("unit.problems = " + pprint.apply(unit.problems))
     }
   }
 

@@ -43,6 +43,7 @@ class SymbolIndexBucket(
     javaHome: Path,
     javaOnly: Boolean,
     addTextDocuments: (
+        SymbolIndexBucket,
         Option[Either[AbsolutePath, GlobalSymbolIndex.Module]],
         SourcePath,
         s.TextDocuments
@@ -71,7 +72,6 @@ class SymbolIndexBucket(
 
   // called for directories in dependency sources
   def addSourceDirectory(
-      module: GlobalSymbolIndex.Module,
       dir: AbsolutePath
   )(implicit rc: ReportContext): List[IndexingResult] = {
     if (sourceJars.addEntry(dir.toNIO)) {
@@ -468,7 +468,7 @@ class SymbolIndexBucket(
         s.TextDocuments(Nil)
     }
     if (docs.documents.nonEmpty) {
-      addTextDocuments(originOpt, SourcePath(input.path), docs)
+      addTextDocuments(this, originOpt, SourcePath(input.path), docs)
     }
   } catch {
     case NonFatal(e) =>
@@ -564,6 +564,7 @@ object SymbolIndexBucket {
       javaHome: Path,
       javaOnly: Boolean,
       addTextDocuments: (
+          SymbolIndexBucket,
           Option[Either[AbsolutePath, GlobalSymbolIndex.Module]],
           SourcePath,
           s.TextDocuments
