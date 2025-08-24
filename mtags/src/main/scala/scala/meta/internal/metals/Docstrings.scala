@@ -297,14 +297,6 @@ class Docstrings(
   }
 }
 
-object Docstrings {
-  def empty(javaHome: Path, mtags: Mtags)(implicit
-      rc: ReportContext
-  ): Docstrings = new Docstrings(
-    OnDemandSymbolIndex.empty(javaHome, mtags)
-  )
-}
-
 sealed trait Content extends Any
 class Markdown(val text: String) extends AnyVal with Content
 class Plain(val text: String) extends AnyVal with Content
