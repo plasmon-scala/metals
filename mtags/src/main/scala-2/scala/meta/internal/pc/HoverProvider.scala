@@ -365,7 +365,26 @@ class HoverProvider(
     var mask = sym.flagMask
     // Strip case modifier off non-class symbols like synthetic apply/copy.
     if (sym.isCase && !sym.isClass) mask &= ~gf.CASE
-    sym.flagString(mask)
+    mask &= ~gf.OVERRIDE
+    mask &= ~gf.FINAL
+    mask &= ~gf.AccessFlags
+    mask &= ~gf.JAVA_DEFAULTMETHOD
+
+    // "abstract trait" feels odd, just "trait" is enough
+    if ((sym.flags & gf.TRAIT) != 0) mask &= ~gf.ABSTRACT
+    // "final" in "final case" is superfluous, just "case" is enough
+    if ((sym.flags & gf.CASE) != 0 && (sym.flags & gf.FINAL) != 0)
+      mask &= ~gf.FINAL
+
+    // put "case" at the end, to avoid things like "case sealed abstract class"
+    val isCase = (sym.flags & gf.CASE) != 0
+    if (isCase) mask &= ~gf.CASE
+
+    // calling flagBitsToString rather than flagString, to drop access stuff, that
+    // can't be dropped with just a mask
+    val str = sym.flagBitsToString(sym.flags & mask)
+    if (isCase) Seq(str, "case").filter(_.nonEmpty).mkString(" ")
+    else str
   }
 
   private def typedHoverTreeAt(
