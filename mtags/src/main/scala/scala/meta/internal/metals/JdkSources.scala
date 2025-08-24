@@ -1,6 +1,7 @@
 package scala.meta.internal.metals
 
 import java.nio.file.Paths
+import java.util.logging.Level
 import java.util.logging.Logger
 
 import scala.util.Failure
@@ -37,8 +38,10 @@ object JdkSources {
     Option(path).filter(_.nonEmpty).flatMap { str =>
       Try(AbsolutePath(str)) match {
         case Failure(exception) =>
-          logger.warning(
-            s"Failed to parse java home path $str: ${exception.getMessage}"
+          logger.log(
+            Level.WARNING,
+            s"Failed to parse java home path $str",
+            exception
           )
           None
         case Success(value) => Some(value)
