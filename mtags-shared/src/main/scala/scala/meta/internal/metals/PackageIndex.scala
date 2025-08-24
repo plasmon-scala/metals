@@ -23,9 +23,8 @@ class PackageIndex() {
   private val isVisited = new util.HashSet[Path]()
   private val enterPackage =
     new util.function.Function[String, util.HashSet[String]] {
-      override def apply(t: String): util.HashSet[String] = {
+      override def apply(t: String): util.HashSet[String] =
         new util.HashSet[String]()
-      }
     }
   def visit(entry: Path, isExcludedPackage: String => Boolean): Unit =
     if (!isVisited.contains(entry)) {
@@ -47,12 +46,11 @@ class PackageIndex() {
       }
     }
 
-  def addMember(pkg: String, member: String): Unit = {
+  def addMember(pkg: String, member: String): Unit =
     if (pkg != "/" && pkg.nonEmpty && !member.contains("module-info.class")) {
       val members = packages.computeIfAbsent(pkg, enterPackage)
       members.add(NameTransformer.decode(member))
     }
-  }
 
   private def visitDirectoryEntry(dir: Path): Unit = {
     Files.walkFileTree(
@@ -75,10 +73,9 @@ class PackageIndex() {
         override def preVisitDirectory(
             dir: Path,
             attrs: BasicFileAttributes
-        ): FileVisitResult = {
+        ): FileVisitResult =
           if (dir.endsWith("META-INF")) FileVisitResult.SKIP_SUBTREE
           else FileVisitResult.CONTINUE
-        }
       }
     )
   }
