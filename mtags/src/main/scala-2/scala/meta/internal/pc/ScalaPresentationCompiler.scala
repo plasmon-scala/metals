@@ -382,7 +382,9 @@ case class ScalaPresentationCompiler(
     val empty: ju.List[Node] = new ju.ArrayList[Node]()
     compilerAccess.withInterruptableCompiler(
       empty,
-      params.token
+      params.token,
+      "semanticTokens",
+      params.uri.toASCIIString
     ) { pc =>
       new PcSemanticTokensProvider(
         pc.compiler(params),
@@ -398,7 +400,9 @@ case class ScalaPresentationCompiler(
     implicit val queryInfo: PcQueryContext = params.toQueryContext
     compilerAccess.withInterruptableCompiler(
       empty,
-      params.token
+      params.token,
+      "syntheticDecorations",
+      params.uri.toASCIIString
     ) { pc =>
       new PcInlayHintsProvider(
         pc.compiler(),
@@ -413,7 +417,9 @@ case class ScalaPresentationCompiler(
     implicit val queryInfo: PcQueryContext = params.toQueryContext
     compilerAccess.withInterruptableCompiler(
       EmptyCompletionList(),
-      params.token
+      params.token,
+      "complete",
+      params.uri.toASCIIString
     ) { pc =>
       new CompletionProvider(pc.compiler(params), params)
         .completions()
@@ -465,7 +471,9 @@ case class ScalaPresentationCompiler(
     implicit val queryInfo = params.toQueryContext
     compilerAccess.withInterruptableCompiler(
       empty,
-      params.token
+      params.token,
+      "implementAbstractMembers",
+      params.uri.toASCIIString
     ) { pc =>
       new CompletionProvider(pc.compiler(params), params).implementAll()
     }
@@ -478,7 +486,9 @@ case class ScalaPresentationCompiler(
     implicit val queryInfo: PcQueryContext = params.toQueryContext
     compilerAccess.withInterruptableCompiler(
       empty,
-      params.token
+      params.token,
+      "insertInferredType",
+      params.uri.toASCIIString
     ) { pc =>
       new InferredTypeProvider(pc.compiler(params), params)
         .inferredTypeEdits()
@@ -512,7 +522,12 @@ case class ScalaPresentationCompiler(
   ): CompletableFuture[ju.List[TextEdit]] = {
     val empty: Either[String, List[TextEdit]] = Right(List())
     (compilerAccess
-      .withInterruptableCompiler(empty, params.token) { pc =>
+      .withInterruptableCompiler(
+        empty,
+        params.token,
+        "inlineValue",
+        params.uri.toASCIIString
+      ) { pc =>
         new PcInlineValueProviderImpl(
           pc.compiler(params),
           params
@@ -530,7 +545,11 @@ case class ScalaPresentationCompiler(
   ): CompletableFuture[ju.List[TextEdit]] = {
     val empty: ju.List[TextEdit] = new ju.ArrayList[TextEdit]()
     implicit val queryInfo: PcQueryContext = range.toQueryContext
-    compilerAccess.withInterruptableCompiler(empty, range.token) { pc =>
+    compilerAccess.withInterruptableCompiler(
+      empty,
+      range.token,
+      s"extractMethod(${range.uri})"
+    ) { pc =>
       new ExtractMethodProvider(
         pc.compiler(range),
         range,
@@ -555,7 +574,12 @@ case class ScalaPresentationCompiler(
   ): CompletableFuture[ju.List[TextEdit]] = {
     val empty: Either[String, List[TextEdit]] = Right(List())
     (compilerAccess
-      .withInterruptableCompiler(empty, params.token) { pc =>
+      .withInterruptableCompiler(
+        empty,
+        params.token,
+        "convertToNamedArguments",
+        params.uri.toASCIIString
+      ) { pc =>
         new ConvertToNamedArgumentsProvider(
           pc.compiler(params),
           params,
@@ -576,7 +600,9 @@ case class ScalaPresentationCompiler(
     implicit val queryInfo: PcQueryContext = params.toQueryContext
     compilerAccess.withInterruptableCompiler(
       List.empty[AutoImportsResult].asJava,
-      params.token
+      params.token,
+      "autoImports",
+      params.uri.toASCIIString
     ) { pc =>
       new AutoImportsProvider(pc.compiler(params), name, params)
         .autoImports()
@@ -612,7 +638,9 @@ case class ScalaPresentationCompiler(
     implicit val queryInfo: PcQueryContext = params.toQueryContext
     compilerAccess.withNonInterruptableCompiler(
       new SignatureHelp(),
-      params.token
+      params.token,
+      "signatureHelp",
+      params.uri.toASCIIString
     ) { pc =>
       new SignatureHelpProvider(pc.compiler(params))
         .signatureHelp(params)
@@ -624,7 +652,9 @@ case class ScalaPresentationCompiler(
   ): CompletableFuture[ju.Optional[Range]] =
     compilerAccess.withNonInterruptableCompiler(
       Optional.empty[Range](),
-      params.token
+      params.token,
+      "prepareRename",
+      params.uri.toASCIIString
     ) { pc =>
       new PcRenameProvider(pc.compiler(params), params, None)
         .prepareRename()
@@ -637,7 +667,9 @@ case class ScalaPresentationCompiler(
   ): CompletableFuture[ju.List[TextEdit]] =
     compilerAccess.withNonInterruptableCompiler(
       List[TextEdit]().asJava,
-      params.token
+      params.token,
+      "rename",
+      params.uri.toASCIIString
     ) { pc =>
       new PcRenameProvider(
         pc.compiler(params),
@@ -651,7 +683,9 @@ case class ScalaPresentationCompiler(
   ): CompletableFuture[CompileResult] =
     compilerAccess.withNonInterruptableCompiler[CompileResult](
       CompileProvider.Result(Nil, ""),
-      params.token
+      params.token,
+      "compile",
+      params.uri.toASCIIString
     ) { pc =>
       val compiler = pc.compiler()
       new CompileProvider(compiler, params).compile()
@@ -663,7 +697,9 @@ case class ScalaPresentationCompiler(
     implicit val queryInfo: PcQueryContext = params.toQueryContext
     compilerAccess.withNonInterruptableCompiler(
       Optional.empty[HoverSignature](),
-      params.token
+      params.token,
+      "hover",
+      params.uri.toASCIIString
     ) { pc =>
       Optional.ofNullable(
         new HoverProvider(
@@ -680,7 +716,9 @@ case class ScalaPresentationCompiler(
   def definition(params: OffsetParams): CompletableFuture[DefinitionResult] = {
     compilerAccess.withNonInterruptableCompiler(
       DefinitionResultImpl.empty,
-      params.token
+      params.token,
+      "definition",
+      params.uri.toASCIIString
     ) { pc =>
       new PcDefinitionProvider(pc.compiler(params), params)
         .definition()
@@ -705,7 +743,9 @@ case class ScalaPresentationCompiler(
   ): CompletableFuture[DefinitionResult] = {
     compilerAccess.withNonInterruptableCompiler(
       DefinitionResultImpl.empty,
-      params.token
+      params.token,
+      "typeDefinition",
+      params.uri.toASCIIString
     ) { pc =>
       new PcDefinitionProvider(pc.compiler(params), params)
         .typeDefinition()
@@ -717,7 +757,9 @@ case class ScalaPresentationCompiler(
   ): CompletableFuture[util.List[DocumentHighlight]] =
     compilerAccess.withInterruptableCompiler(
       List.empty[DocumentHighlight].asJava,
-      params.token()
+      params.token(),
+      "documentHighlight",
+      params.uri.toASCIIString
     ) { pc =>
       new PcDocumentHighlightProvider(pc.compiler(params), params)
         .highlights()
@@ -822,7 +864,7 @@ case class ScalaPresentationCompiler(
     compilerAccess.withInterruptableCompiler(
       Array.emptyByteArray,
       param.token(),
-      Some(timeout)
+      customTimeout = Some(timeout)
     ) { pc =>
       val provider = new SemanticdbTextDocumentProvider(
         pc.compiler(),
@@ -902,7 +944,9 @@ case class ScalaPresentationCompiler(
   ): CompletableFuture[Array[Byte]] = {
     compilerAccess.withInterruptableCompiler(
       Array.emptyByteArray,
-      EmptyCancelToken
+      EmptyCancelToken,
+      "semanticdbTextDocument",
+      virtualFile.uri().toASCIIString
     ) { pc =>
       new SemanticdbTextDocumentProvider(
         pc.compiler(virtualFile),

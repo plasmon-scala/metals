@@ -32,7 +32,7 @@ abstract class CompilerAccess[Reporter, Compiler](
     id: String = ""
 )(implicit ec: ExecutionContextExecutor) {
 
-  private val jobs = CompilerJobQueue(id)
+  val jobs: CompilerJobQueue = CompilerJobQueue(id)
   private var _compiler: CompilerWrapper[Reporter, Compiler] = _
   private var isShutdown: Boolean = false
   private def isEmpty: Boolean = _compiler == null
@@ -100,12 +100,23 @@ abstract class CompilerAccess[Reporter, Compiler](
     }
   }
 
+  private var beforeAccess0 = Option.empty[(String, String) => Unit]
+  private var afterAccess0 = Option.empty[(String, String) => Unit]
+  def beforeAccess(f: (String, String) => Unit): Unit = {
+    beforeAccess0 = Some(f)
+  }
+  def afterAccess(f: (String, String) => Unit): Unit = {
+    afterAccess0 = Some(f)
+  }
+
   /**
    * Asynchronously execute a function on the compiler thread with `Thread.interrupt()` cancellation.
    */
   def withInterruptableCompiler[T](
       default: T,
       token: CancelToken,
+      name: String = "",
+      uri: String = "",
       customTimeout: Option[Duration] = None
   )(
       thunk: CompilerWrapper[Reporter, Compiler] => T
@@ -113,6 +124,8 @@ abstract class CompilerAccess[Reporter, Compiler](
     val isFinished = new AtomicBoolean(false)
     var queueThread = Option.empty[Thread]
     val result = onCompilerJobQueue(
+      name,
+      uri,
       () => {
         queueThread = Some(Thread.currentThread())
         try withSharedCompiler(default)(thunk)
@@ -152,11 +165,15 @@ abstract class CompilerAccess[Reporter, Compiler](
    */
   def withNonInterruptableCompiler[T](
       default: T,
-      token: CancelToken
+      token: CancelToken,
+      name: String = "",
+      uri: String = ""
   )(
       thunk: CompilerWrapper[Reporter, Compiler] => T
   )(implicit queryInfo: PcQueryContext): CompletableFuture[T] = {
     onCompilerJobQueue(
+      name,
+      uri,
       () => withSharedCompiler(default)(thunk),
       token
     )
@@ -232,12 +249,16 @@ abstract class CompilerAccess[Reporter, Compiler](
   }
 
   private def onCompilerJobQueue[T](
+      name: String,
+      uri: String,
       thunk: () => T,
       token: CancelToken,
       customTimeout: Option[Duration] = None
   ): CompletableFuture[T] = {
     val result = new CompletableFuture[T]()
     jobs.submit(
+      name,
+      uri,
       result,
       { () =>
         try {
@@ -245,7 +266,9 @@ abstract class CompilerAccess[Reporter, Compiler](
             result.completeExceptionally(new CancellationException())
           } else {
             Thread.interrupted() // clear interrupt bit
-            result.complete(thunk())
+            beforeAccess0.foreach(_(name, uri))
+            try result.complete(thunk())
+            finally afterAccess0.foreach(_(name, uri))
           }
         } catch {
           case NonFatal(e) =>
