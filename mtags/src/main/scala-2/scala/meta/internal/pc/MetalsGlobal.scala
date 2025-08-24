@@ -126,11 +126,7 @@ class MetalsGlobal(
         mode: Mode,
         pt: Type
     ): Tree = {
-      if (
-        standardIsBlackbox(expandee.symbol) &&
-        typer.context.openImplicits.isEmpty
-      ) expandee
-      else super.pluginsMacroExpand(typer, expandee, mode, pt)
+      expandee
     }
   }
 
