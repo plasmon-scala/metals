@@ -200,10 +200,20 @@ class SymbolIndexBucket(
     ).readPackage match {
       case Nil => Nil
       case packageParts =>
-        val className = input.path.stripSuffix(".java")
+        val relPathOpt = SourcePath(input.path) match {
+          case z: SourcePath.ZipEntry =>
+            Some(z.pathInZip)
+          case s: SourcePath.Standard =>
+            originOpt match {
+              case Some(Left(dir)) =>
+                Some(dir.toNIO.relativize(s.path).toString)
+              case _ =>
+                None
+            }
+        }
+        val className = input.path.split('/').last.stripSuffix(".java")
         val symbol = packageParts.mkString("", "/", s"/$className#")
-        val isTrivialToplevelSymbol0 = AbsolutePath(input.path)
-          .toIdeallyRelativeURI()
+        val isTrivialToplevelSymbol0 = relPathOpt
           .exists { subPath =>
             isTrivialToplevelSymbol(
               subPath,
