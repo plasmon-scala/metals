@@ -84,6 +84,14 @@ abstract class CompilerAccess[Reporter, Compiler](
     afterAccess0 = Some(f)
   }
 
+  def interrupt(): Boolean =
+    _compiler.presentationCompilerThread match {
+      case None => false
+      case Some(pcThread) =>
+        pcThread.interrupt()
+        true
+    }
+
   /**
    * Asynchronously execute a function on the compiler thread with `Thread.interrupt()` cancellation.
    */
