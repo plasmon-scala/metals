@@ -98,7 +98,7 @@ trait PCSuite {
     val file = tmp.resolve(filename)
     Files.createDirectories(file.toNIO.getParent)
     Files.write(file.toNIO, code2.getBytes(StandardCharsets.UTF_8))
-    try index.addSourceFile(file, Some(tmp), dialect)
+    try index.addSourceFile(file, dialect)
     catch {
       case NonFatal(e) =>
         println(s"warn: ${e.getMessage}")

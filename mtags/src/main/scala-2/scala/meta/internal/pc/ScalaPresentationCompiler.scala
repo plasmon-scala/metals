@@ -56,6 +56,7 @@ import org.eclipse.lsp4j.Range
 import org.eclipse.lsp4j.SelectionRange
 import org.eclipse.lsp4j.SignatureHelp
 import org.eclipse.lsp4j.TextEdit
+import scala.meta.internal.mtags.SourcePath
 
 class ScalaPresentationCompiler(
     userLoggerSupplier: java.util.function.Supplier[
@@ -456,9 +457,11 @@ class ScalaPresentationCompiler(
       "autoImports",
       params.uri.toASCIIString
     ) { pc =>
-      new AutoImportsProvider(pc.compiler(params), name, params)
-        .autoImports()
-        .asJava
+      SourcePath.withContext { implicit ctx =>
+        new AutoImportsProvider(pc.compiler(params), name, params)
+          .autoImports()
+          .asJava
+      }
     }
   }
 
