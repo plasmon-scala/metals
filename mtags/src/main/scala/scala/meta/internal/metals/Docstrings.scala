@@ -247,13 +247,12 @@ class Docstrings(
   )(implicit ctx: SourcePath.Context): Unit = {
     filenameToLanguage(defn.path.uri) match {
       case Language.JAVA =>
-        JavadocIndexer
-          .foreach(defn.path.toInput, contentType)(
-            cacheSymbol(module, _, contentType)
-          )
+        JavadocIndexer.foreach(defn.path.toInput, contentType)(
+          cacheSymbol(module, _, contentType)
+        )
       case Language.SCALA =>
-        ScaladocIndexer
-          .foreach(defn.path.toInput, defn.dialect, contentType)(
+        for (dialect <- defn.dialectOpt)
+          ScaladocIndexer.foreach(defn.path.toInput, dialect, contentType)(
             cacheSymbol(module, _, contentType)
           )
       case _ =>
