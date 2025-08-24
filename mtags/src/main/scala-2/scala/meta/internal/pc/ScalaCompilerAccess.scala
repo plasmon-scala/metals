@@ -61,6 +61,9 @@ class ScalaCompilerAccess(
       userLogger
     ) {
 
+  def latestException(): Option[(Option[String], Throwable)] =
+    latestExceptionOpt
+
   def newReporter = new StoreReporter
 
   protected def handleSharedCompilerException(
