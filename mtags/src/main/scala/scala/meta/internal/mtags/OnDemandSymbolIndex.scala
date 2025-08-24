@@ -32,7 +32,7 @@ import scala.meta.pc.reports.ReportContext
  * in Option.scala is non-trivial while `Option#` in Option.scala is trivial.
  */
 final class OnDemandSymbolIndex(
-    dialectBuckets: TrieMap[
+    val dialectBuckets: TrieMap[
       (Dialect, GlobalSymbolIndex.Module),
       SymbolIndexBucket
     ],

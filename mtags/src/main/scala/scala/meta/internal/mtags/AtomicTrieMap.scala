@@ -9,7 +9,7 @@ import scala.jdk.CollectionConverters._
  * This class is a wrapper around TrieMap that provides atomic updateWith
  */
 final class AtomicTrieMap[K, V] {
-  private val trieMap = new TrieMap[K, V]()
+  val trieMap = new TrieMap[K, V]()
   private val concurrentMap = new ConcurrentHashMap[K, V]
 
   override def toString(): String = trieMap.toString()
