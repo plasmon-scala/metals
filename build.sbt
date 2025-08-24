@@ -196,13 +196,13 @@ val sharedScalacOptions = List(
     CrossVersion.partialVersion(scalaVersion.value) match {
       //  Scala 2.12 and 2.11 cannot output for JDKs > 8
       case partialVersion if isScala211(partialVersion) =>
-        List("-target:jvm-1.8", "-Yrangepos", "-Xexperimental")
+        List("-Yrangepos", "-Xexperimental")
       case partialVersion if isScala212(partialVersion) =>
         List("-Yrangepos", "-Xexperimental")
       case partialVersion if isScala3(partialVersion) =>
-        List("-Xtarget:17", "-language:implicitConversions", "-Xsemanticdb")
+        List("-language:implicitConversions", "-Xsemanticdb")
       case _ =>
-        List("-target:17", "-Yrangepos")
+        List("-Yrangepos")
     }
   }
 )
