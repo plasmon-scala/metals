@@ -77,7 +77,7 @@ object HtmlConverter {
       case e: Element =>
         processHtmlElement(e)
       case _ =>
-        println(s"unknown element - $node")
+        System.err.println(s"unknown element - $node")
         ""
     }
   }
