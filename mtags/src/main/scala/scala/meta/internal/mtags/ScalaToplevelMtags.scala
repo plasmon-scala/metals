@@ -22,6 +22,7 @@ import scala.meta.internal.tokenizers.LegacyToken._
 import scala.meta.internal.tokenizers.LegacyTokenData
 import scala.meta.pc.reports.ReportContext
 import scala.meta.tokenizers.TokenizeException
+import java.util.function.Consumer
 
 final class Identifier(val name: String, val pos: Position) {
   override def toString: String = pos.formatMessage("info", name)
@@ -50,7 +51,8 @@ class ScalaToplevelMtags(
     includeInnerClasses: Boolean,
     includeMembers: Boolean,
     dialect: Dialect,
-    collectIdentifiers: Boolean = false
+    collectIdentifiers: Boolean = false,
+    logger: Consumer[String] = null
 )(implicit rc: ReportContext)
     extends MtagsIndexer {
 
@@ -348,7 +350,13 @@ class ScalaToplevelMtags(
             }
           } else scanner.mtagsNextToken()
           loop(indent.notAfterNewline, currRegion, newExpectIgnoreBody)
-        case IMPORT | EXPORT =>
+        case IMPORT =>
+          // skip imports because they might have `given` kw
+          acceptToStatSep()
+          loop(indent.notAfterNewline, currRegion, expectTemplate)
+        case EXPORT =>
+          if (logger != null)
+            logger.accept(s"Found export $data")
           // skip imports because they might have `given` kw
           acceptToStatSep()
           loop(indent.notAfterNewline, currRegion, expectTemplate)
