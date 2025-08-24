@@ -40,6 +40,7 @@ class JavaInteractiveSemanticdbSuite extends FunSuite {
         val javaCompile = JavaInteractiveSemanticdb
           .create(
             AbsolutePath(workspace),
+            AbsolutePath(workspace),
             buildTargets,
           )
         val fileToCompile =
@@ -59,6 +60,7 @@ class JavaInteractiveSemanticdbSuite extends FunSuite {
     val buildTargets = BuildTargets.empty
     val javaCompile = JavaInteractiveSemanticdb
       .create(
+        AbsolutePath(workspace),
         AbsolutePath(workspace),
         buildTargets,
       )
@@ -85,6 +87,7 @@ class JavaInteractiveSemanticdbSuite extends FunSuite {
     val buildTargets = BuildTargets.empty
     val javaCompile = JavaInteractiveSemanticdb
       .create(
+        AbsolutePath(workspace),
         AbsolutePath(workspace),
         buildTargets,
       )
