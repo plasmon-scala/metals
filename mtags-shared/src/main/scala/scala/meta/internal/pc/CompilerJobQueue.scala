@@ -10,6 +10,8 @@ import java.{util => ju}
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.ThreadFactory
 
+import scala.jdk.CollectionConverters._
+
 /**
  * A thread pool executor to execute jobs on a single thread in a last-in-first-out order.
  *
@@ -34,12 +36,17 @@ class CompilerJobQueue(newExecutor: () => ThreadPoolExecutor) {
 
   private val state = new AtomicReference[State](State.Empty)
 
-  def submit(fn: () => Unit): Unit = {
-    submit(new CompletableFuture[Unit](), fn)
+  def submit(name: String, uri: String, fn: () => Unit): Unit = {
+    submit(name, uri, new CompletableFuture[Unit](), fn)
   }
-  def submit(result: CompletableFuture[_], fn: () => Unit): Unit = {
+  def submit(
+      name: String,
+      uri: String,
+      result: CompletableFuture[_],
+      fn: () => Unit
+  ): Unit = {
     onExecutor(
-      _.execute(new CompilerJobQueue.Job(result, fn)),
+      _.execute(new CompilerJobQueue.Job(name, uri, result, fn)),
       () => result.completeExceptionally(new CancellationException())
     )
   }
@@ -100,6 +107,28 @@ class CompilerJobQueue(newExecutor: () => ThreadPoolExecutor) {
     }
   }
 
+  def runningJob(): Option[CompilerJobQueue.Job] =
+    state.get() match {
+      case State.Initialized(v) =>
+        v.asInstanceOf[CompilerJobQueue.HasRunningJob].runningJobOpt
+      case _ =>
+        None
+    }
+
+  def jobQueue(): List[CompilerJobQueue.Job] =
+    state.get() match {
+      case State.Initialized(v) =>
+        v.getQueue()
+          .asScala
+          .toList
+          .map {
+            case job: CompilerJobQueue.Job => job
+            case _ => sys.error("Cannot happen")
+          }
+      case _ =>
+        Nil
+    }
+
   private def delay(): Unit = Thread.sleep(50)
 
   override def toString(): String = s"CompilerJobQueue(${state.get})"
@@ -118,6 +147,10 @@ object CompilerJobQueue {
     final case class Initialized(v: ThreadPoolExecutor) extends State
     case object Initializing extends State
     case object Stopped extends State
+  }
+
+  trait HasRunningJob {
+    def runningJobOpt: Option[Job]
   }
 
   private val instanceNumber = new AtomicInteger(1)
@@ -142,7 +175,19 @@ object CompilerJobQueue {
             t
           }
         }
-      )
+      ) with HasRunningJob {
+        def runningJobOpt = running
+        private var running = Option.empty[Job]
+        override protected def beforeExecute(t: Thread, r: Runnable): Unit =
+          r match {
+            case job: Job =>
+              running = Some(job)
+            case _ =>
+          }
+        override protected def afterExecute(r: Runnable, t: Throwable): Unit =
+          if (running.contains(r))
+            running = None
+      }
       singleThreadExecutor.setRejectedExecutionHandler {
         case (j: Job, _) =>
           j.reject()
@@ -155,8 +200,12 @@ object CompilerJobQueue {
   /**
    * Runnable with a timestamp and attached completable future.
    */
-  private class Job(result: CompletableFuture[_], _run: () => Unit)
-      extends Runnable {
+  class Job(
+      val name: String,
+      val uri: String,
+      val result: CompletableFuture[_],
+      _run: () => Unit
+  ) extends Runnable {
     def reject(): Unit = {
       result.completeExceptionally(new CancellationException("rejected"))
     }
