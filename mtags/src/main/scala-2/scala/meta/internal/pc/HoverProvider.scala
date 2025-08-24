@@ -53,6 +53,8 @@ class HoverProvider(
         (pos, tree)
       case params: OffsetParams =>
         val pos = unit.position(params.offset())
+        if (Option(System.getenv("PLASMON_DEBUG")).contains("true"))
+          scribe.info("pos = " + scala.util.Try(pos.toString))
         val tree = typedHoverTreeAt(pos, unit)
         (pos, tree)
     }
