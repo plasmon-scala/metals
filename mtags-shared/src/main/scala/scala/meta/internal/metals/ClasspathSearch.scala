@@ -80,16 +80,16 @@ object ClasspathSearch {
     new ClasspathSearch(Array.empty)
 
   def fromClasspath(
-      classpath: collection.Seq[Path],
+      indices: collection.Seq[PackageIndex],
       excludePackages: ExcludedPackagesHandler,
       javaHome: Path,
       bucketSize: Int = CompressedPackageIndex.DefaultBucketSize
   ): ClasspathSearch =
-    Indexer.default.index(classpath, excludePackages, javaHome, bucketSize)
+    Indexer.default.index(indices, excludePackages, javaHome, bucketSize)
 
   trait Indexer {
     def index(
-        classpath: collection.Seq[Path],
+        indices: collection.Seq[PackageIndex],
         excludePackages: ExcludedPackagesHandler,
         javaHome: Path,
         bucketSize: Int = CompressedPackageIndex.DefaultBucketSize
@@ -102,21 +102,21 @@ object ClasspathSearch {
 
   class DefaultClasspathIndexer extends Indexer {
     override def index(
-        classpath: collection.Seq[Path],
+        indices: collection.Seq[PackageIndex],
         excludePackages: ExcludedPackagesHandler,
         javaHome: Path,
         bucketSize: Int = CompressedPackageIndex.DefaultBucketSize
     ): ClasspathSearch = {
-      val packages = PackageIndex.fromClasspath(
-        classpath,
-        excludePackages.isExcludedPackage,
-        javaHome
-      )
       val map = CompressedPackageIndex.fromPackages(
         () =>
-          packages.packages.asScala.iterator.map { pkg =>
-            (pkg._1, pkg._2.asScala)
-          },
+          indices.iterator
+            .flatMap(_.packages.asScala.iterator)
+            .toVector
+            .groupBy(_._1)
+            .iterator
+            .map { case (pkg, l) =>
+              (pkg, l.flatMap(_._2.asScala))
+            },
         excludePackages.isExcludedPackage,
         bucketSize
       )
