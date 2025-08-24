@@ -59,6 +59,7 @@ import scala.meta.internal.mtags.GlobalSymbolIndex
 import scala.meta.internal.mtags.SourcePath
 
 class ScalaPresentationCompiler(
+    javaHome: Path,
     userLoggerSupplier: java.util.function.Supplier[
       java.util.function.Consumer[String]
     ],
@@ -683,9 +684,7 @@ class ScalaPresentationCompiler(
         processAll = true
       )
     }
-    if (classpath.isEmpty) {
-      settings.usejavacp.value = true
-    }
+    settings.javabootclasspath.value = ""
     val (isSuccess, unprocessed) =
       settings.processArguments(options, processAll = true)
     userLogger.accept(
@@ -701,6 +700,7 @@ class ScalaPresentationCompiler(
     for (file <- this.classpath)
       userLogger.accept(s"  $file")
     new MetalsGlobal(
+      javaHome,
       userLogger,
       settings,
       new StoreReporter {
