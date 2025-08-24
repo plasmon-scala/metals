@@ -25,4 +25,4 @@ jobs:
           PGP_PASSPHRASE: ${{ secrets.PUBLISH_SECRET_KEY_PASSWORD }}
           PGP_SECRET: ${{ secrets.PUBLISH_SECRET_KEY_BASE64 }}
           SONATYPE_PASSWORD: ${{ secrets.PUBLISH_PASSWORD }}
-          SONATYPE_USERNAME: ${{ secrets.PUBLISH_USERNAME }}
+          SONATYPE_USERNAME: ${{ secrets.PUBLISH_USER }}
