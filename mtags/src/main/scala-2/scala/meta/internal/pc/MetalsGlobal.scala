@@ -46,7 +46,6 @@ import scala.meta.pc.SymbolSearch
 import org.eclipse.{lsp4j => l}
 import scala.tools.nsc.util.ClassPath
 import scala.reflect.io.FileZipArchive
-import scala.tools.nsc.classpath.FileUtils
 
 import java.util.concurrent.ConcurrentHashMap
 import java.io.PrintStream
@@ -111,6 +110,13 @@ class MetalsGlobal(
     logger.log(Level.FINE, "Restarting compiler and clearing caches.")
   }
 
+  override lazy val platform: ThisPlatform = {
+    new scala.tools.nsc.backend.JavaPlatform {
+      lazy val global: compiler.type = compiler
+      override lazy val classPath: ClassPath = actualClassPath(super.classPath)
+    }
+  }
+
   private val typeCheckingCache =
     new ConcurrentHashMap[AbstractFile, Array[Char]]
   def metalsTypeCheck(unit: RichCompilationUnit): Unit = {
@@ -164,7 +170,7 @@ class MetalsGlobal(
     res
   }
 
-  override lazy val classPath: ClassPath = {
+  private def actualClassPath(superClassPath: ClassPath): ClassPath = {
     import MetalsGlobal.fza
 
     val modFiles = settings.classpath.value
@@ -288,7 +294,7 @@ class MetalsGlobal(
     }
 
     new scala.tools.nsc.classpath.metals.AggregateClassPath(
-      Seq(modCp, super.classPath)
+      Seq(modCp, superClassPath)
     )
   }
 
