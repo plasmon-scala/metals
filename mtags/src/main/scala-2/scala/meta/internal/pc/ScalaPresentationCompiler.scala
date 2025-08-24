@@ -69,7 +69,8 @@ case class ScalaPresentationCompiler(
     reportsLevel: ReportLevel = ReportLevel.Info,
     completionItemPriority: CompletionItemPriority = (_: String) => 0,
     optReportContext: Option[ReportContext] = None
-) extends PresentationCompiler {
+) extends PresentationCompiler
+    with HasCompilerAccess {
   implicit val reportContext: ReportContext =
     optReportContext.getOrElse(new EmptyReportContext())
 
@@ -138,7 +139,7 @@ case class ScalaPresentationCompiler(
         |${options.mkString(" ")}
         |""".stripMargin
 
-  val compilerAccess =
+  val compilerAccess: ScalaCompilerAccess =
     new ScalaCompilerAccess(
       config,
       sh,
