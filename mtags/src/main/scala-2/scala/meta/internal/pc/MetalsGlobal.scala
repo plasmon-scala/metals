@@ -253,7 +253,7 @@ class MetalsGlobal(
       query: String,
       pos: Position,
       visit: Member => Boolean
-  ): SymbolSearch.Result = {
+  )(implicit ctx: m.internal.mtags.SourcePath.Context): SymbolSearch.Result = {
 
     def isRelevantWorkspaceSymbol(sym: Symbol): Boolean =
       sym.isStatic && !sym.isStale
@@ -293,14 +293,14 @@ class MetalsGlobal(
         visitMember
       )
       searchOutline(visitMember, query)
-      search.search(query, buildTargetIdentifier, visitor)
+      search.search(query, buildTargetIdentifier, visitor, ctx.iface)
     }
   }
 
   def workspaceSymbolListMembers(
       query: String,
       pos: Position
-  ): List[Member] = {
+  )(implicit ctx: m.internal.mtags.SourcePath.Context): List[Member] = {
     val buffer = mutable.ListBuffer.empty[Member]
     val isSeen = mutable.Set.empty[String]
     workspaceSymbolListMembers(

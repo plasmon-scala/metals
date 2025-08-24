@@ -4,8 +4,8 @@ import scala.meta.internal.{semanticdb => s}
 import scala.meta.io.AbsolutePath
 
 sealed abstract class TextDocumentLookup {
-  case class MissingSemanticdb(file: AbsolutePath)
-      extends Exception(s"missing SemanticDB: $file")
+  case class MissingSemanticdb(uri: String)
+      extends Exception(s"missing SemanticDB: $uri")
   case class StaleSemanticdb(file: AbsolutePath)
       extends Exception(s"stale SemanticDB: $file")
   final def isNotFound: Boolean =
@@ -38,7 +38,7 @@ sealed abstract class TextDocumentLookup {
       case TextDocumentLookup.NotFound(file) =>
         Left(MissingSemanticdb(file))
       case TextDocumentLookup.NoMatchingUri(file, _) =>
-        Left(MissingSemanticdb(file))
+        Left(MissingSemanticdb(file.toNIO.toUri.toASCIIString))
       case TextDocumentLookup.Stale(file, _, _) =>
         Left(StaleSemanticdb(file))
       case TextDocumentLookup.Error(e, _) =>
@@ -58,14 +58,14 @@ object TextDocumentLookup {
   ): TextDocumentLookup =
     doc match {
       case Some(value) => Success(value, path)
-      case None => NotFound(path)
+      case None => NotFound(path.toNIO.toUri.toASCIIString)
     }
   case class Success(document: s.TextDocument, path: AbsolutePath)
       extends TextDocumentLookup
   case class Aggregate(errors: List[TextDocumentLookup])
       extends TextDocumentLookup
-  case class Error(e: Throwable, path: AbsolutePath) extends TextDocumentLookup
-  case class NotFound(file: AbsolutePath) extends TextDocumentLookup
+  case class Error(e: Throwable, uri: String) extends TextDocumentLookup
+  case class NotFound(uri: String) extends TextDocumentLookup
   case class NoMatchingUri(file: AbsolutePath, documents: s.TextDocuments)
       extends TextDocumentLookup
   case class Stale(

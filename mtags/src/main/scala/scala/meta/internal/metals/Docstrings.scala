@@ -14,6 +14,7 @@ import scala.meta.internal.mtags.GlobalSymbolIndex
 import scala.meta.internal.mtags.OnDemandSymbolIndex
 import scala.meta.internal.mtags.ScalaMtags
 import scala.meta.internal.mtags.ScalametaCommonEnrichments._
+import scala.meta.internal.mtags.SourcePath
 import scala.meta.internal.mtags.Symbol
 import scala.meta.internal.mtags.SymbolDefinition
 import scala.meta.internal.semanticdb.Language
@@ -44,7 +45,7 @@ class Docstrings(index: GlobalSymbolIndex)(implicit rc: ReportContext) {
       parents: ParentSymbols,
       contentType: ContentType,
       logger: java.util.function.Consumer[String]
-  ): Optional[SymbolDocumentation] = {
+  )(implicit ctx: SourcePath.Context): Optional[SymbolDocumentation] = {
     val result = getFromCacheWithProxy(symbol, contentType) match {
       case Some(value) =>
         if (value == EmptySymbolDocumentation) None
@@ -84,7 +85,7 @@ class Docstrings(index: GlobalSymbolIndex)(implicit rc: ReportContext) {
       parents: ParentSymbols,
       contentType: ContentType,
       logger: java.util.function.Consumer[String]
-  ): SymbolDocumentation = {
+  )(implicit ctx: SourcePath.Context): SymbolDocumentation = {
     parents
       .parents()
       .asScala
@@ -144,7 +145,7 @@ class Docstrings(index: GlobalSymbolIndex)(implicit rc: ReportContext) {
       symbol: String,
       contentType: ContentType,
       logger: java.util.function.Consumer[String]
-  ): Unit = {
+  )(implicit ctx: SourcePath.Context): Unit = {
     index.definition(Symbol(symbol)) match {
       case Some(defn) =>
         try {
@@ -155,7 +156,7 @@ class Docstrings(index: GlobalSymbolIndex)(implicit rc: ReportContext) {
           if (logger != null) logger.accept("Done indexing javadoc / scaladoc")
         } catch {
           case NonFatal(e) =>
-            logger0.log(Level.SEVERE, defn.path.toURI.toString, e)
+            logger0.log(Level.SEVERE, defn.path.uri.toString, e)
             if (logger != null) {
               logger.accept(
                 s"Error while indexing javadoc / scaladoc of $symbol"
@@ -192,8 +193,8 @@ class Docstrings(index: GlobalSymbolIndex)(implicit rc: ReportContext) {
   private def indexSymbolDefinition(
       defn: SymbolDefinition,
       contentType: ContentType
-  ): Unit = {
-    defn.path.toLanguage match {
+  )(implicit ctx: SourcePath.Context): Unit = {
+    filenameToLanguage(defn.path.uri) match {
       case Language.JAVA =>
         JavadocIndexer
           .foreach(defn.path.toInput, contentType)(cacheSymbol(_, contentType))

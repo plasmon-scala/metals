@@ -52,10 +52,9 @@ trait GlobalSymbolIndex {
    *                   literal.
    */
   def addSourceFile(
-      file: AbsolutePath,
-      sourceDirectory: Option[AbsolutePath],
+      file: SourcePath,
       dialect: Dialect
-  ): Option[IndexingResult]
+  )(implicit ctx: SourcePath.Context): Option[IndexingResult]
 
   /**
    * Index a jar or zip file containing Scala and Java source files.
@@ -88,7 +87,11 @@ trait GlobalSymbolIndex {
   def addSourceJar(
       jar: AbsolutePath,
       dialect: Dialect
-  ): List[IndexingResult]
+  )(implicit ctx: SourcePath.Context): List[IndexingResult]
+
+  def addSourceJar(
+      jar: AbsolutePath
+  )(implicit ctx: SourcePath.Context): List[IndexingResult]
 
   /**
    * The same as `addSourceJar` except for directories
@@ -106,14 +109,14 @@ trait GlobalSymbolIndex {
    */
   def findFileForToplevel(
       topLevelSymbol: mtags.Symbol
-  ): List[(AbsolutePath, Dialect)]
+  )(implicit ctx: SourcePath.Context): List[(SourcePath, Dialect)]
 
 }
 
 case class SymbolDefinition(
     querySymbol: Symbol,
     definitionSymbol: Symbol,
-    path: AbsolutePath,
+    path: SourcePath,
     dialect: Dialect,
     range: Option[s.Range],
     kind: Option[s.SymbolInformation.Kind],
@@ -124,7 +127,7 @@ case class SymbolDefinition(
 }
 
 case class IndexingResult(
-    path: AbsolutePath,
+    path: SourcePath,
     topLevels: List[String],
     overrides: List[(String, List[OverriddenSymbol])]
 )

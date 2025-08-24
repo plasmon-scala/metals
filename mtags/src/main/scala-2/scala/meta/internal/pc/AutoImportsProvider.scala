@@ -8,6 +8,7 @@ import scala.meta.pc.AutoImportsResult
 import scala.meta.pc.OffsetParams
 
 import org.eclipse.{lsp4j => l}
+import scala.meta.internal.mtags.SourcePath
 
 final class AutoImportsProvider(
     val compiler: MetalsGlobal,
@@ -16,7 +17,9 @@ final class AutoImportsProvider(
 )(implicit queryInfo: PcQueryContext) {
   import compiler._
 
-  def autoImports(): List[AutoImportsResult] = {
+  def autoImports()(implicit
+      ctx: SourcePath.Context
+  ): List[AutoImportsResult] = {
     val unit = addCompilationUnit(
       code = params.text(),
       filename = params.uri().toString(),
@@ -45,7 +48,7 @@ final class AutoImportsProvider(
 
     val visitor =
       new CompilerSearchVisitor(context, visit)
-    search.search(name, buildTargetIdentifier, visitor)
+    search.search(name, buildTargetIdentifier, visitor, ctx.iface)
 
     def isInImportTree: Boolean = lastVisitedParentTrees match {
       case (_: Import) :: _ => true

@@ -12,6 +12,7 @@ import scala.meta.internal.io.{ListFiles => _}
 import scala.meta.io.AbsolutePath
 import scala.meta.pc.reports.ReportContext
 import java.nio.file.Path
+import scala.meta.inputs.Input
 
 /**
  * An implementation of GlobalSymbolIndex with fast indexing and low memory usage.
@@ -78,7 +79,7 @@ final class OnDemandSymbolIndex(
       dialect: Dialect
   ): List[IndexingResult] =
     tryRun(
-      dir,
+      dir.toString,
       List.empty,
       getOrCreateBucket(dialect).addSourceDirectory(dir)
     )
@@ -88,9 +89,9 @@ final class OnDemandSymbolIndex(
   override def addSourceJar(
       jar: AbsolutePath,
       dialect: Dialect
-  ): List[IndexingResult] =
+  )(implicit ctx: SourcePath.Context): List[IndexingResult] =
     tryRun(
-      jar,
+      jar.toString,
       List.empty, {
         try {
           getOrCreateBucket(dialect).addSourceJar(jar)
@@ -105,23 +106,41 @@ final class OnDemandSymbolIndex(
       }
     )
 
+  override def addSourceJar(
+      jar: AbsolutePath
+  )(implicit ctx: SourcePath.Context): List[IndexingResult] =
+    tryRun(
+      jar.toString,
+      List.empty, {
+        try {
+          var res = List.empty[IndexingResult]
+          for (bucket <- dialectBuckets.values) {
+            res = bucket.addSourceJar(jar, isPureJava = true)
+          }
+          res
+        } catch {
+          case e: ZipError =>
+            onError(new IndexingExceptions.InvalidJarException(jar, e))
+            List.empty
+          case e: ZipException =>
+            onError(new IndexingExceptions.InvalidJarException(jar, e))
+            List.empty
+        }
+      }
+    )
+
   // Traverses all source files in the given jar file and returns
   // all non-trivial toplevel Scala symbols.
   def indexSource(
-      path: AbsolutePath,
-      sourceDirectory: Option[AbsolutePath],
+      input: Input.VirtualFile,
       dialect: Dialect
   ): IndexingResult =
-    getOrCreateBucket(dialect).indexSource(
-      path,
-      sourceDirectory,
-      isJava = false
-    )
+    getOrCreateBucket(dialect).indexSource(input, isJava = false)
 
   // Used to add cached toplevel symbols to index
   def addIndexedSourceJar(
       jar: AbsolutePath,
-      symbols: List[(String, AbsolutePath)],
+      symbols: List[(String, SourcePath)],
       dialect: Dialect
   ): Unit = {
     getOrCreateBucket(dialect).addIndexedSourceJar(jar, symbols)
@@ -130,28 +149,27 @@ final class OnDemandSymbolIndex(
   // Enters nontrivial toplevel symbols for Scala source files.
   // All other symbols can be inferred on the fly.
   override def addSourceFile(
-      source: AbsolutePath,
-      sourceDirectory: Option[AbsolutePath],
+      source: SourcePath,
       dialect: Dialect
-  ): Option[IndexingResult] =
+  )(implicit ctx: SourcePath.Context): Option[IndexingResult] =
     tryRun(
-      source,
+      source.uri,
       None, {
         indexedSources += 1
         getOrCreateBucket(dialect)
-          .addSourceFile(source, sourceDirectory, isJava = false)
+          .addSourceFile(source.toInput, isJava = false)
       }
     )
 
   def addToplevelSymbol(
       path: String,
-      source: AbsolutePath,
+      source: SourcePath,
       toplevel: String,
       dialect: Dialect
   ): Unit =
     getOrCreateBucket(dialect).addToplevelSymbol(path, source, toplevel)
 
-  private def tryRun[A](path: AbsolutePath, fallback: => A, thunk: => A): A =
+  private def tryRun[A](path: String, fallback: => A, thunk: => A): A =
     try thunk
     catch {
       case NonFatal(e) =>
@@ -170,7 +188,7 @@ final class OnDemandSymbolIndex(
 
   def findFileForToplevel(
       topLevelSymbol: Symbol
-  ): List[(AbsolutePath, Dialect)] = {
+  )(implicit ctx: SourcePath.Context): List[(SourcePath, Dialect)] = {
     dialectBuckets.values.flatMap(_.findFileForToplevel(topLevelSymbol)).toList
   }
 

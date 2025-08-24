@@ -18,6 +18,7 @@ import org.eclipse.lsp4j.CompletionItemTag
 import org.eclipse.lsp4j.CompletionList
 import org.eclipse.lsp4j.InsertTextFormat
 import org.eclipse.{lsp4j => l}
+import scala.meta.internal.mtags.SourcePath
 
 class CompletionProvider(
     val compiler: MetalsGlobal,
@@ -58,7 +59,9 @@ class CompletionProvider(
     val isSnippet = isSnippetEnabled(pos, params.text())
 
     val (i, completion, identOffsets, editRange, query) =
-      safeCompletionsAt(pos, params.uri())
+      SourcePath.withContext { implicit ctx =>
+        safeCompletionsAt(pos, params.uri())
+      }
 
     val InferredIdentOffsets(
       start,
@@ -365,7 +368,7 @@ class CompletionProvider(
       editRange: l.Range,
       latestParentTrees: List[Tree],
       text: String
-  ): InterestingMembers = {
+  )(implicit ctx: SourcePath.Context): InterestingMembers = {
     val isSeen = mutable.Set.empty[String]
     val isIgnored = mutable.Set.empty[Symbol]
     val buf = List.newBuilder[Member]
@@ -497,6 +500,8 @@ class CompletionProvider(
   private def safeCompletionsAt(
       pos: Position,
       source: URI
+  )(implicit
+      ctx: SourcePath.Context
   ): (
       InterestingMembers,
       CompletionPosition,
