@@ -256,6 +256,7 @@ lazy val interfaces = project
       "-tag",
       "implNote:a:Implementation Note:",
     ),
+    Compile / doc / sources := Seq.empty,
   )
 
 lazy val mtagsShared = project
@@ -281,6 +282,7 @@ lazy val mtagsShared = project
       V.guava,
       "io.get-coursier" % "interface" % V.coursierInterfaces,
     ),
+    Compile / doc / sources := Seq.empty,
   )
   .dependsOn(interfaces)
 
@@ -515,6 +517,7 @@ lazy val metals = project
       IO.write(file, sharedJavaOptions.mkString("\n"))
       Seq(file)
     },
+    Compile / doc / sources := Seq.empty,
   )
   .dependsOn(mtags, `mtags-java`)
   .enablePlugins(BuildInfoPlugin)
