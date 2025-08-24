@@ -307,6 +307,17 @@ trait ScalametaCommonEnrichments extends CommonMtagsEnrichments {
         )
         .isEmpty
     }
+
+    def toIdeallyRelativeURI(): Option[String] = {
+      val uri = new URI(doc)
+      if (uri.getScheme == "jar")
+        Option(uri.getRawSchemeSpecificPart).map(_.split("!", 2)).collect {
+          case Array(_, subPath) if subPath.startsWith("/") =>
+            subPath.drop(1)
+        }
+      else
+        None
+    }
   }
 
   implicit class XtensionRelativePathMetals(file: RelativePath) {
