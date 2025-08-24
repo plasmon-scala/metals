@@ -168,7 +168,7 @@ class JavadocSuite extends BaseSuite {
         |- `url`: an absolute URL giving the base location of the image
         |- `name`: the location of the image, relative to the url argument
         |
-        |**Returns:** the image at the specified URL
+        |**Returns** the image at the specified URL
         |
         |**Throws**
         |- `IOException`: when stuff hapend
@@ -208,7 +208,7 @@ class JavadocSuite extends BaseSuite {
        |- `param2`: description of param2
        |- `param3`: description of param3
        |
-       |**Returns:** the image at the specified URL
+       |**Returns** the image at the specified URL
        |
        |**Throws**
        |- `IOException`: when stuff hapend
