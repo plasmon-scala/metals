@@ -3,6 +3,7 @@ package scala.meta.internal.pc
 import scala.collection.Seq
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
+import scala.util.control.NonFatal
 
 import scala.meta.internal.jdk.CollectionConverters._
 import scala.meta.internal.metals.PcQueryContext
@@ -60,7 +61,15 @@ trait Signatures { compiler: MetalsGlobal =>
         renames = renamedSymbols(scope),
         config = renameConfig
       )
-      val tpeString = shortType(tpe, history).toString()
+      val tpeString = {
+        val tpe0 = shortType(tpe, history)
+        try tpe0.toString()
+        catch {
+          case NonFatal(e) =>
+            scribe.warn("Ignoring exception", e)
+            "?"
+        }
+      }
       val edits = history.autoImports(pos, importPosition)
       (tpeString, edits)
     }
