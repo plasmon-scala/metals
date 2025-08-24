@@ -35,6 +35,12 @@ public abstract class PresentationCompiler {
   // Language Server Protocol APIs.
   // ==============================
 
+  /**
+   * Returns the type of the expression at the given position along with the symbol of the
+   * referenced symbol.
+   */
+  public abstract CompletableFuture<CompileResult> compile(VirtualFileParams params);
+
   /** Returns token informations from presentation compiler. */
   public CompletableFuture<List<Node>> semanticTokens(VirtualFileParams params) {
 

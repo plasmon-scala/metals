@@ -17,6 +17,7 @@ import scala.meta.internal.pc.DefinitionResultImpl
 import scala.meta.internal.pc.EmptySymbolSearch
 import scala.meta.internal.pc.PresentationCompilerConfigImpl
 import scala.meta.pc.AutoImportsResult
+import scala.meta.pc.CompileResult
 import scala.meta.pc.DefinitionResult
 import scala.meta.pc.HoverSignature
 import scala.meta.pc.InlayHintsParams
@@ -133,6 +134,12 @@ case class ProtoPresentationCompiler(
         )
       }
     }
+
+  override def compile(
+      params: VirtualFileParams
+  ): CompletableFuture[CompileResult] = {
+    ???
+  }
 
   override def rename(
       params: OffsetParams,

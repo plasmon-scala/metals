@@ -34,6 +34,7 @@ import scala.meta.internal.pc.JavaRenameProvider
 import scala.meta.internal.pc.PresentationCompilerConfigImpl
 import scala.meta.pc.AutoImportsResult
 import scala.meta.pc.CodeActionId
+import scala.meta.pc.CompileResult
 import scala.meta.pc.DefinitionResult
 import scala.meta.pc.DisplayableException
 import scala.meta.pc.EmbeddedClient
@@ -172,6 +173,12 @@ case class JavaPresentationCompiler(
           .orNull
       )
     }
+
+  override def compile(
+      params: VirtualFileParams
+  ): CompletableFuture[CompileResult] = {
+    ???
+  }
 
   override def rename(
       params: OffsetParams,

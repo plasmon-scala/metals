@@ -40,6 +40,7 @@ import scala.meta.internal.mtags.MtagsEnrichments._
 import scala.meta.internal.{semanticdb => s}
 import scala.meta.pc.AutoImportsResult
 import scala.meta.pc.CodeActionId
+import scala.meta.pc.CompileResult
 import scala.meta.pc.CompletionItemPriority
 import scala.meta.pc.DefinitionResult
 import scala.meta.pc.DisplayableException
@@ -642,6 +643,17 @@ case class ScalaPresentationCompiler(
         params,
         Some(name)
       ).rename().asJava
+    }(params.toQueryContext)
+
+  override def compile(
+      params: VirtualFileParams
+  ): CompletableFuture[CompileResult] =
+    compilerAccess.withNonInterruptableCompiler[CompileResult](
+      CompileProvider.Result(Nil, ""),
+      params.token
+    ) { pc =>
+      val compiler = pc.compiler()
+      new CompileProvider(compiler, params).compile()
     }(params.toQueryContext)
 
   override def hover(
