@@ -358,7 +358,13 @@ val mtagsSettings = List(
   },
   buildInfoPackage := "scala.meta.internal.mtags",
   buildInfoKeys := Seq[BuildInfoKey](
-    "scalaCompilerVersion" -> scalaVersion.value
+    "scalaCompilerVersion" -> scalaVersion.value,
+    "deprecatedScalaVersions" -> V.deprecatedScalaVersions,
+    "supportedScalaVersions" -> V.supportedScalaVersions,
+    "supportedScalaBinaryVersions" -> V.supportedScalaBinaryVersions,
+    "scala212" -> V.scala212,
+    "scala213" -> V.scala213,
+    "scala3" -> V.scala3,
   ),
   Compile / unmanagedSourceDirectories := {
     val current = (Compile / unmanagedSourceDirectories).value
@@ -489,8 +495,6 @@ lazy val metals = project
       "supportedScalaVersions" -> V.supportedScalaVersions,
       "supportedScala2Versions" -> V.scala2Versions,
       "minimumSupportedSbtVersion" -> V.minimumSupportedSbtVersion,
-      "supportedScalaBinaryVersions" -> V.supportedScalaBinaryVersions,
-      "deprecatedScalaVersions" -> V.deprecatedScalaVersions,
       "nonDeprecatedScalaVersions" -> V.nonDeprecatedScalaVersions,
       "scala211" -> V.scala211,
       "scala212" -> V.scala212,
