@@ -98,11 +98,13 @@ object CompressedPackageIndex {
       // and ~900kb compressed. We are accummulating a lot of different custom indexes in Metals
       // so we should try to keep each of them as small as possible.
       val compressedMembers = Compression.compress(members.asScala.iterator)
-      buckets += CompressedPackageIndex(
-        bufPackages.result(),
-        bucket,
-        compressedMembers
-      )
+      val packages = bufPackages.result()
+      if (packages.nonEmpty)
+        buckets += CompressedPackageIndex(
+          packages,
+          bucket,
+          compressedMembers
+        )
     }
 
     // Record the start of a new package.
