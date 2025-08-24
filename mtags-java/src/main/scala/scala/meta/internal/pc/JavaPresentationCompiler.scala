@@ -13,6 +13,7 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContextExecutor
 import scala.jdk.CollectionConverters._
 
+import scala.compat.java8.FutureConverters
 import scala.meta.pc.AutoImportsResult
 import scala.meta.pc.DefinitionResult
 import scala.meta.pc.HoverSignature
@@ -37,19 +38,17 @@ import org.eclipse.lsp4j.SignatureHelp
 import org.eclipse.lsp4j.TextEdit
 import scala.meta.pc.ContentType
 import javax.tools.JavaFileManager
+import scala.concurrent.Future
 
 case class JavaPresentationCompiler(
     javaFileManager: () => JavaFileManager,
     logger: java.util.function.Consumer[String],
     moduleString: String,
+    ec: ExecutionContextExecutor,
     classpath: Seq[Path] = Nil,
-    options: List[String] = Nil, // unused?
     search: SymbolSearch = EmptySymbolSearch,
-    ec: ExecutionContextExecutor = ExecutionContext.global, // unused?
-    sh: Option[ScheduledExecutorService] = None, // unused?
     config: PresentationCompilerConfig =
-      PresentationCompilerConfigImpl(hoverContentType = ContentType.MARKDOWN),
-    workspace: Option[Path] = None // unused?
+      PresentationCompilerConfigImpl(hoverContentType = ContentType.MARKDOWN)
 ) extends PresentationCompiler {
 
   private lazy val javaCompiler = {
@@ -60,31 +59,35 @@ case class JavaPresentationCompiler(
     new JavaMetalsGlobal(javaFileManager(), search, config, classpath)
   }
 
+  private def run[T](f: => T): CompletableFuture[T] =
+    FutureConverters.toJava(Future(f)(ec)).toCompletableFuture
+
   override def complete(
       params: OffsetParams
   ): CompletableFuture[CompletionList] =
-    CompletableFuture.completedFuture(
+    run {
       new JavaCompletionProvider(
         javaCompiler,
         params,
         config.isCompletionSnippetsEnabled
       ).completions()
-    )
+    }
 
   override def completionItemResolve(
       item: CompletionItem,
       symbol: String
-  ): CompletableFuture[CompletionItem] = CompletableFuture.completedFuture(item)
+  ): CompletableFuture[CompletionItem] =
+    CompletableFuture.completedFuture(item)
 
   override def signatureHelp(
       params: OffsetParams
   ): CompletableFuture[SignatureHelp] =
-    CompletableFuture.completedFuture(new SignatureHelp())
+    CompletableFuture.completedFuture(new SignatureHelp)
 
   override def hover(
       params: OffsetParams
   ): CompletableFuture[Optional[HoverSignature]] =
-    CompletableFuture.completedFuture(
+    run {
       Optional.ofNullable(
         new JavaHoverProvider(
           javaCompiler,
@@ -95,7 +98,7 @@ case class JavaPresentationCompiler(
           .hover(moduleString)
           .orNull
       )
-    )
+    }
 
   override def compile(
       params: VirtualFileParams
@@ -200,14 +203,15 @@ case class JavaPresentationCompiler(
 
   override def withScheduledExecutorService(
       scheduledExecutorService: ScheduledExecutorService
-  ): PresentationCompiler = copy(sh = Some(scheduledExecutorService))
+  ): PresentationCompiler =
+    this
 
   override def withConfiguration(
       config: PresentationCompilerConfig
   ): PresentationCompiler = copy(config = config)
 
   override def withWorkspace(workspace: Path): PresentationCompiler =
-    copy(workspace = Some(workspace))
+    this
 
   override def newInstance(
       moduleString: String,
@@ -216,8 +220,7 @@ case class JavaPresentationCompiler(
   ): PresentationCompiler =
     copy(
       moduleString = moduleString,
-      classpath = classpath.asScala.toSeq,
-      options = options.asScala.toList
+      classpath = classpath.asScala.toSeq
     )
 
   override def diagnosticsForDebuggingPurposes(): util.List[String] = Nil.asJava
