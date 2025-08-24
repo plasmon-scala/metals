@@ -66,6 +66,9 @@ class ScalaCompilerAccess(
       id
     ) {
 
+  def latestException(): Option[(Option[String], Throwable)] =
+    latestExceptionOpt
+
   def newReporter = new MetalsReporter(new Settings())
 
   protected def handleSharedCompilerException(
