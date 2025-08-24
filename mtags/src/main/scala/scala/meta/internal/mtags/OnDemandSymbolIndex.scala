@@ -34,6 +34,7 @@ final class OnDemandSymbolIndex(
     javaHome: Path
 )(implicit rc: ReportContext)
     extends GlobalSymbolIndex {
+  // private lazy val sourceJars0 = sourceJars()
   val mtags = new Mtags
   var indexedSources = 0L
   def close(): Unit = {
