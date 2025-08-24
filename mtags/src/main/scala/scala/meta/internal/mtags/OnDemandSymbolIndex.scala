@@ -27,6 +27,7 @@ import scala.meta.io.AbsolutePath
  */
 final class OnDemandSymbolIndex(
     onError: PartialFunction[Throwable, Unit],
+    sourceJars: () => OpenClassLoader,
     toIndexSource: AbsolutePath => AbsolutePath,
     isClasspathDefinitionIndexEnabled: () => Boolean,
     val mtags: () => Mtags,
@@ -46,6 +47,7 @@ final class OnDemandSymbolIndex(
         mtags = mtags,
         isClasspathDefinitionIndexEnabled = isClasspathDefinitionIndexEnabled,
         dialect = dialect,
+        sourceJars = sourceJars(),
         toIndexSource = toIndexSource,
         onError = onError,
         javaHome = javaHome
@@ -184,11 +186,13 @@ object OnDemandSymbolIndex {
         throw e
       },
       mtags: () => Mtags = () => Mtags.testingSingleton,
+      sourceJars: () => OpenClassLoader = () => new OpenClassLoader,
       toIndexSource: AbsolutePath => AbsolutePath = identity,
       isClasspathDefinitionIndexEnabled: () => Boolean = () => false
   ): OnDemandSymbolIndex = {
     new OnDemandSymbolIndex(
       onError,
+      sourceJars,
       toIndexSource,
       isClasspathDefinitionIndexEnabled,
       mtags = mtags,
