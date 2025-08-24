@@ -270,6 +270,7 @@ lazy val mtagsShared = project
       "com.google.protobuf" % "protobuf-java" % "4.32.1",
       V.guava,
       "io.get-coursier" % "interface" % V.coursierInterfaces,
+      "com.lihaoyi" %% "pprint" % V.pprint,
     ),
   )
   .dependsOn(interfaces)
@@ -350,12 +351,7 @@ val mtagsSettings = List(
       ),
     )
   },
-  libraryDependencies ++= {
-    if (isCI) Nil
-    // NOTE(olafur) pprint is indispensable for me while developing, I can't
-    // use println anymore for debugging because pprint.log is 100 times better.
-    else List("com.lihaoyi" %% "pprint" % V.pprint)
-  },
+  libraryDependencies += "com.lihaoyi" %% "pprint" % V.pprint,
   buildInfoPackage := "scala.meta.internal.mtags",
   buildInfoKeys := Seq[BuildInfoKey](
     "scalaCompilerVersion" -> scalaVersion.value,
@@ -468,6 +464,7 @@ lazy val metals = project
       "io.modelcontextprotocol.sdk" % "mcp" % "0.12.1",
       "com.fasterxml.jackson.core" % "jackson-databind" % "2.20.0",
       "io.undertow" % "undertow-servlet" % "2.3.12.Final",
+      "com.lihaoyi" %% "os-lib" % "0.9.1",
     ),
     buildInfoPackage := "scala.meta.internal.metals",
     buildInfoKeys := Seq[BuildInfoKey](
