@@ -273,7 +273,7 @@ class SymbolIndexBucket(
           .filter(sym => !isTrivialToplevelSymbol(input.path, sym, "java"))
           .toList
       } else
-        AbsolutePath(input.path).toIdeallyRelativeURI() match {
+        input.path.toIdeallyRelativeURI() match {
           case Some(subPath) =>
             sourceTopLevels
               .filter(sym => !isTrivialToplevelSymbol(subPath, sym, "scala"))
