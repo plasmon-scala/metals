@@ -57,7 +57,6 @@ inThisBuild(
     dependencyOverrides += V.guava,
     // faster publishLocal:
     packageDoc / publishArtifact := sys.env.contains("CI"),
-    packageSrc / publishArtifact := sys.env.contains("CI"),
   )
 )
 
@@ -264,7 +263,6 @@ lazy val mtagsShared = project
       if213 = List("-release:8", "-target:8"),
     ),
     crossVersion := CrossVersion.full,
-    Compile / packageSrc / publishArtifact := true,
     libraryDependencies ++= List(
       "org.lz4" % "lz4-java" % "1.8.0",
       "com.google.protobuf" % "protobuf-java" % "4.32.1",
