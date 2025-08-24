@@ -2,7 +2,6 @@ package scala.meta.internal.metals
 
 import java.io.ByteArrayOutputStream
 import java.nio.charset.StandardCharsets
-import java.nio.file.Path
 import java.util.Optional
 import java.util.concurrent.Executors
 import java.util.concurrent.ThreadFactory
@@ -18,7 +17,6 @@ import scala.meta.inputs.Input
 import scala.meta.internal.jdk.CollectionConverters._
 import scala.meta.internal.mtags.GlobalSymbolIndex
 import scala.meta.internal.mtags.MtagsEnrichments._
-import scala.meta.internal.mtags.OnDemandSymbolIndex
 import scala.meta.internal.mtags.ScalaMtags
 import scala.meta.internal.mtags.SourcePath
 import scala.meta.internal.mtags.Symbol
@@ -294,13 +292,6 @@ class Docstrings(
           scribe.error(s"Error indexing docstrings of $symbol in $module", t)
       }
   }
-}
-
-object Docstrings {
-  def empty(javaHome: Path)(implicit rc: ReportContext): Docstrings =
-    new Docstrings(
-      OnDemandSymbolIndex.empty(javaHome)
-    )
 }
 
 sealed trait Content extends Any
