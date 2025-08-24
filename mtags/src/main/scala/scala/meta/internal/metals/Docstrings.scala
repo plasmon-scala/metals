@@ -308,7 +308,7 @@ class Docstrings(
 object Docstrings {
   def empty(javaHome: Path, mtags: () => Mtags): Docstrings =
     new Docstrings(
-      OnDemandSymbolIndex.empty(javaHome)(mtags().rc),
+      OnDemandSymbolIndex.empty(javaHome, mtags())(mtags().rc),
       mtags
     )
 }
