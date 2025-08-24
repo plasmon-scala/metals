@@ -149,7 +149,8 @@ abstract class CompilerAccess[Reporter, Compiler](
     } catch {
       case InterruptException() =>
         default
-      case other: Throwable =>
+      case other: Throwable
+          if java.lang.Boolean.getBoolean("plasmon.enable-interactive-retry") =>
         handleSharedCompilerException(other)
           .map { message =>
             retryWithCleanCompiler(
