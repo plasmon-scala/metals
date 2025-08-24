@@ -178,15 +178,6 @@ def lintingOptions(scalaVersion: String) = {
   )
 }
 
-val sharedJavacOptions = List(
-  Compile / javacOptions ++= {
-    if (sys.props("java.version").startsWith("17"))
-      Nil
-    else
-      Seq("--release", "17")
-  }
-)
-
 val sharedJavaOptions = Seq(
   "--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED",
   "--add-exports=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED",
@@ -211,18 +202,18 @@ val sharedScalacOptions = List(
     CrossVersion.partialVersion(scalaVersion.value) match {
       //  Scala 2.12 and 2.11 cannot output for JDKs > 8
       case partialVersion if isScala211(partialVersion) =>
-        List("-target:jvm-1.8", "-Yrangepos", "-Xexperimental")
+        List("-Yrangepos", "-Xexperimental")
       case partialVersion if isScala212(partialVersion) =>
         List("-Yrangepos", "-Xexperimental")
       case partialVersion if isScala3(partialVersion) =>
-        List("-Xtarget:17", "-language:implicitConversions", "-Xsemanticdb")
+        List("-language:implicitConversions", "-Xsemanticdb")
       case _ =>
-        List("-target:17", "-Yrangepos")
+        List("-Yrangepos")
     }
   }
 )
 
-val sharedSettings = sharedJavacOptions ++ sharedScalacOptions ++ List(
+val sharedSettings = sharedScalacOptions ++ List(
   Compile / doc / sources := Seq.empty,
   libraryDependencies ++= crossSetting(
     scalaVersion.value,
@@ -261,7 +252,6 @@ lazy val interfaces = project
     libraryDependencies ++= List(
       V.lsp4j
     ),
-    javacOptions := Seq("--release", "8"),
     crossVersion := CrossVersion.disabled,
     Compile / doc / javacOptions ++= List(
       "-tag",
@@ -283,7 +273,7 @@ lazy val mtagsShared = project
     ),
     scalacOptions ++= crossSetting(
       scalaVersion.value,
-      if213 = List("-release:8", "-target:8"),
+      if213 = List("-release:17", "-target:17"),
     ),
     crossVersion := CrossVersion.full,
     Compile / packageSrc / publishArtifact := true,
