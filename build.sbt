@@ -76,7 +76,6 @@ inThisBuild(
     dependencyOverrides += V.guava,
     // faster publishLocal:
     packageDoc / publishArtifact := sys.env.contains("CI"),
-    packageSrc / publishArtifact := sys.env.contains("CI"),
     PB.protocVersion := V.protobuf,
   )
 )
@@ -408,7 +407,6 @@ lazy val mtagsShared = project
     ),
     crossVersion := CrossVersion.full,
     libraryDependencies ++= pprintDebuggingDependency,
-    Compile / packageSrc / publishArtifact := true,
     libraryDependencies ++= List(
       "com.google.protobuf" % "protobuf-java-util" % V.protobuf,
       "com.google.protobuf" % "protobuf-java" % V.protobuf,
