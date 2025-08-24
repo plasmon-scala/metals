@@ -159,7 +159,7 @@ class ScalafixProviderLspSuite extends BaseLspSuite("scalafix-provider") {
           ServerCommands.RunScalafix,
           textParams,
         )
-        .recoverWith { case ScalafixProvider.ScalafixRunException(_) =>
+        .recoverWith { case _: ScalafixProvider.ScalafixRunException =>
           Future.unit
         }
       _ = assertNoDiff(
