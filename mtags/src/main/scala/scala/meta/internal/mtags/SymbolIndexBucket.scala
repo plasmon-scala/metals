@@ -405,6 +405,7 @@ object SymbolIndexBucket {
   def empty(
       dialect: Dialect,
       mtags: Mtags,
+      sourceJars: OpenClassLoader,
       toIndexSource: AbsolutePath => AbsolutePath,
       onError: PartialFunction[Throwable, Unit],
       javaHome: Path
@@ -412,7 +413,7 @@ object SymbolIndexBucket {
     new SymbolIndexBucket(
       AtomicTrieMap.empty,
       AtomicTrieMap.empty,
-      new OpenClassLoader,
+      sourceJars,
       toIndexSource,
       mtags,
       dialect,
