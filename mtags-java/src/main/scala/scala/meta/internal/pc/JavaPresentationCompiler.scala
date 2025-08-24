@@ -48,7 +48,9 @@ case class JavaPresentationCompiler(
     classpath: Seq[Path] = Nil,
     search: SymbolSearch = EmptySymbolSearch,
     config: PresentationCompilerConfig =
-      PresentationCompilerConfigImpl(hoverContentType = ContentType.MARKDOWN)
+      PresentationCompilerConfigImpl(hoverContentType = ContentType.MARKDOWN),
+    wrapper: JavaPresentationCompiler.Wrapper =
+      JavaPresentationCompiler.Wrapper.default
 ) extends PresentationCompiler {
 
   private lazy val javaCompiler = {
@@ -66,13 +68,15 @@ case class JavaPresentationCompiler(
     )
   }
 
-  private def run[T](f: => T): CompletableFuture[T] =
-    FutureConverters.toJava(Future(f)(ec)).toCompletableFuture
+  private def run[T](name: String)(f: => T): CompletableFuture[T] =
+    FutureConverters
+      .toJava(Future(wrapper.run(name)(f))(ec))
+      .toCompletableFuture
 
   override def complete(
       params: OffsetParams
   ): CompletableFuture[CompletionList] =
-    run {
+    run("complete") {
       new JavaCompletionProvider(
         javaCompiler,
         params,
@@ -96,7 +100,7 @@ case class JavaPresentationCompiler(
   override def hover(
       params: OffsetParams
   ): CompletableFuture[Optional[HoverSignature]] =
-    run {
+    run("hover") {
       Optional.ofNullable(
         new JavaHoverProvider(
           javaCompiler,
@@ -259,4 +263,17 @@ case class JavaPresentationCompiler(
     CompletableFuture.completedFuture(
       new JavaRenameProvider(javaCompiler, params, None).prepareRename()
     )
+}
+
+object JavaPresentationCompiler {
+  trait Wrapper {
+    def run[T](name: String)(f: => T): T
+  }
+
+  object Wrapper {
+    def default: Wrapper =
+      new Wrapper {
+        def run[T](name: String)(f: => T): T = f
+      }
+  }
 }
