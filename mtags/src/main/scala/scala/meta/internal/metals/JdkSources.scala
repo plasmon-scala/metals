@@ -11,6 +11,7 @@ import scala.util.Try
 import scala.meta.internal.mtags.ScalametaCommonEnrichments._
 import scala.meta.io.AbsolutePath
 import scala.meta.io.RelativePath
+import java.util.logging.Level
 
 /**
  * Locates zip file on disk that contains the source code for the JDK.
@@ -37,8 +38,10 @@ object JdkSources {
     Option(path).filter(_.nonEmpty).flatMap { str =>
       Try(AbsolutePath(str)) match {
         case Failure(exception) =>
-          logger.warning(
-            s"Failed to parse java home path $str: ${exception.getMessage}"
+          logger.log(
+            Level.WARNING,
+            s"Failed to parse java home path $str",
+            exception
           )
           None
         case Success(value) => Some(value)
