@@ -209,6 +209,14 @@ class PackageIndex() {
 }
 
 object PackageIndex {
+  def fromFile(
+      file: Path,
+      isExcludedPackage: String => Boolean
+  ): PackageIndex = {
+    val packages = new PackageIndex
+    packages.visit(file, isExcludedPackage)
+    packages
+  }
   def fromClasspath(
       classpath: collection.Seq[Path],
       isExcludedPackage: String => Boolean,
