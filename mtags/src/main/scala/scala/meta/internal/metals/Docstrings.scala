@@ -30,16 +30,33 @@ import scala.meta.pc.reports.ReportContext
 import java.nio.file.Path
 import java.io.ByteArrayOutputStream
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.Executors
+import java.util.concurrent.ThreadFactory
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Implementation of the `documentation(symbol: String): Option[SymbolDocumentation]` method in `SymbolSearch`.
  *
  * Handles both javadoc and scaladoc.
  */
-class Docstrings(index: GlobalSymbolIndex)(implicit rc: ReportContext) {
+class Docstrings(
+    index: GlobalSymbolIndex,
+    indexInBackground: Boolean = false
+)(implicit rc: ReportContext) {
   val cache =
     new TrieMap[(Content, GlobalSymbolIndex.Module), SymbolDocumentation]()
   private val logger0 = Logger.getLogger(classOf[Docstrings].getName)
+
+  private lazy val pool = Executors.newSingleThreadExecutor(
+    new ThreadFactory {
+      val count = new AtomicInteger
+      override def newThread(r: Runnable): Thread = {
+        val t = new Thread(r, s"docstrings-${count.incrementAndGet()}")
+        t.setDaemon(true)
+        t
+      }
+    }
+  )
 
   def reset(): Unit =
     cache.clear()
@@ -52,42 +69,43 @@ class Docstrings(index: GlobalSymbolIndex)(implicit rc: ReportContext) {
       logger: java.util.function.Consumer[String]
   )(implicit ctx: SourcePath.Context): Optional[SymbolDocumentation] = {
     val content = Content.from(symbol, contentType)
-    if (!cache.contains((content, module)))
-      indexSymbol(module, symbol, contentType, logger)
-    val result0 = cache.get((content, module))
-    if (result0.isEmpty)
-      cache((content, module)) = EmptySymbolDocumentation
-    val result = result0.filter(_ != EmptySymbolDocumentation)
-    /* Fall back to parent javadocs/scaladocs if nothing is specified for the current symbol
-     * This way we also cache the result in order not to calculate parents again.
-     */
-    val resultWithParentDocs = result match {
-      case Some(value: MetalsSymbolDocumentation)
-          if value.docstring.isEmpty() =>
-        Some(
-          parentDocumentation(
-            module,
-            symbol,
-            value,
-            parents,
-            contentType,
-            logger
-          )
-        )
+    if (!indexInBackground && !cache.contains((content, module)))
+      new IndexSymbol(content, symbol, module, contentType, logger).run()
+
+    getFromCacheWithProxy(module, symbol, contentType) match {
       case None =>
-        Some(
-          parentDocumentation(
-            module,
-            symbol,
-            MetalsSymbolDocumentation.empty(symbol),
-            parents,
-            contentType,
-            logger
-          )
-        )
-      case _ => result
+        val runnable =
+          new IndexSymbol(content, symbol, module, contentType, logger)
+        if (indexInBackground) pool.submit(runnable)
+        Optional.of(MetalsSymbolDocumentation.ongoing(symbol))
+      case Some(result) =>
+        /* Fall back to parent javadocs/scaladocs if nothing is specified for the current symbol
+         * This way we also cache the result in order not to calculate parents again.
+         */
+        val resultWithParentDocs = result match {
+          case value: MetalsSymbolDocumentation if value.docstring.isEmpty() =>
+            parentDocumentation(
+              module,
+              symbol,
+              value,
+              parents,
+              contentType,
+              logger
+            )
+          case EmptySymbolDocumentation =>
+            parentDocumentation(
+              module,
+              symbol,
+              MetalsSymbolDocumentation.empty(symbol),
+              parents,
+              contentType,
+              logger
+            )
+          case _ => result
+        }
+        // scribe.info(s"resultWithParentDocs=$resultWithParentDocs")
+        Optional.ofNullable(resultWithParentDocs)
     }
-    Optional.ofNullable(resultWithParentDocs.orNull)
   }
 
   def parentDocumentation(
@@ -98,18 +116,28 @@ class Docstrings(index: GlobalSymbolIndex)(implicit rc: ReportContext) {
       contentType: ContentType,
       logger: java.util.function.Consumer[String]
   )(implicit ctx: SourcePath.Context): SymbolDocumentation = {
-    parents
+    val parentsDoc = parents
       .parents()
       .asScala
-      .flatMap { s =>
+      .map { s =>
         val content = Content.from(s, contentType)
-        if (!cache.contains((content, module)))
-          indexSymbol(module, s, contentType, logger)
-        getFromCacheWithProxy(module, s, contentType)
+        val onGoing = !cache.contains((content, module)) && {
+          val runnable =
+            new IndexSymbol(content, s, module, contentType, logger)
+          if (indexInBackground) pool.submit(runnable)
+          else runnable.run()
+          indexInBackground
+        }
+        (onGoing, getFromCacheWithProxy(module, s, contentType))
       }
+    parentsDoc
+      .flatMap(_._2)
       .find(_.docstring().nonEmpty)
       .fold {
-        docs
+        if (parentsDoc.exists(_._1))
+          docs.copy(docstring = "...")
+        else
+          docs
       } { withDocs =>
         val updated = docs.copy(docstring = withDocs.docstring())
         cache((Content.from(symbol, contentType), module)) = updated
@@ -246,6 +274,25 @@ class Docstrings(index: GlobalSymbolIndex)(implicit rc: ReportContext) {
     }
   }
 
+  private class IndexSymbol(
+      content: Content,
+      symbol: String,
+      module: GlobalSymbolIndex.Module,
+      contentType: ContentType,
+      logger: java.util.function.Consumer[String]
+  )(implicit ctx: SourcePath.Context)
+      extends Runnable {
+    def run(): Unit =
+      try {
+        if (!cache.contains((content, module)))
+          indexSymbol(module, symbol, contentType, logger)
+        if (!cache.contains((content, module)))
+          cache((content, module)) = EmptySymbolDocumentation
+      } catch {
+        case t: Throwable =>
+          scribe.error(s"Error indexing docstrings of $symbol in $module", t)
+      }
+  }
 }
 
 object Docstrings {
