@@ -1,6 +1,5 @@
 package scala.meta.internal.metals
 
-import java.net.URI
 import java.nio.file._
 import java.nio.file.attribute.BasicFileAttributes
 import java.util
@@ -27,24 +26,25 @@ class PackageIndex() {
         new util.HashSet[String]()
       }
     }
-  def visit(entry: Path): Unit = {
-    if (isVisited.contains(entry)) ()
-    else {
+  def visit(entry: Path, isExcludedPackage: String => Boolean): Unit =
+    if (!isVisited.contains(entry)) {
       isVisited.add(entry)
       try {
-        if (Files.isDirectory(entry)) {
+        if (Files.isDirectory(entry))
           visitDirectoryEntry(entry)
-        } else if (
-          Files.isRegularFile(entry) && entry.toString.endsWith(".jar")
-        ) {
-          visitJarEntry(entry)
-        }
+        else if (Files.isRegularFile(entry) && entry.toString.endsWith(".jar"))
+          visitJarEntry(entry, isExcludedPackage = isExcludedPackage)
+        else if (Files.isRegularFile(entry) && entry.toString.endsWith(".jmod"))
+          visitJarEntry(
+            entry,
+            isMod = true,
+            isExcludedPackage = isExcludedPackage
+          )
       } catch {
         case NonFatal(e) =>
           logger.log(Level.SEVERE, entry.toURI.toString, e)
       }
     }
-  }
 
   def addMember(pkg: String, member: String): Unit = {
     if (!member.contains("module-info.class")) {
@@ -131,7 +131,12 @@ class PackageIndex() {
     }
   }
 
-  private def visitJarEntry(jarpath: Path): Unit = {
+  private def visitJarEntry(
+      jarpath: Path,
+      isMod: Boolean = false,
+      isExcludedPackage: String => Boolean
+  ): Unit = {
+    val requiredPrefix = if (isMod) "classes/" else ""
     val file = jarpath.toFile
     val jar = new JarFile(file)
     try {
@@ -140,26 +145,28 @@ class PackageIndex() {
         val element = entries.nextElement()
         if (
           !element.isDirectory &&
-          !element.getName.startsWith("META-INF") &&
+          element.getName.startsWith(requiredPrefix) &&
+          !element.getName.startsWith(s"${requiredPrefix}META-INF") &&
           element.getName.endsWith(".class")
         ) {
-          val pkg = dirname(element.getName)
-          val member = basename(element.getName)
+          val name = element.getName.stripPrefix(requiredPrefix)
+          val pkg = dirname(name)
+          val member = basename(name)
           addMember(pkg, member)
         }
       }
-      val manifest = jar.getManifest
-      if (manifest != null) {
-        val classpathAttr = manifest.getMainAttributes.getValue("Class-Path")
-        if (classpathAttr != null) {
-          classpathAttr.split(" ").foreach { relpath =>
-            Option(jarpath.getParent)
-              .map(_.resolve(relpath))
-              .find(abspath =>
-                Files.isRegularFile(abspath) || Files.isDirectory(abspath)
-              )
-              .foreach(visit)
-          }
+      if (!isMod) {
+        val manifest = jar.getManifest
+        if (manifest != null) {
+          val classpathAttr = manifest.getMainAttributes.getValue("Class-Path")
+          if (classpathAttr != null)
+            for (relpath <- classpathAttr.split(" "))
+              Option(jarpath.getParent)
+                .map(_.resolve(relpath))
+                .find(abspath =>
+                  Files.isRegularFile(abspath) || Files.isDirectory(abspath)
+                )
+                .foreach(visit(_, isExcludedPackage))
         }
       }
     } finally {
@@ -175,50 +182,28 @@ class PackageIndex() {
       sys.error(s"Cannot get Java version from $javaHome")
     }
     if (javaVer.major >= 9)
-      expandJrtClasspath(isExcludedPackage)
+      expandJrtClasspath(javaHome, isExcludedPackage)
     else
-      PackageIndex.bootClasspath.foreach(visit)
+      PackageIndex.bootClasspath.foreach(visit(_, isExcludedPackage))
   }
 
-  private def expandJrtClasspath(isExcludedPackage: String => Boolean): Unit = {
-    val fs = FileSystems.getFileSystem(URI.create("jrt:/"))
-    val dir = fs.getPath("/packages")
-    for {
-      pkg <- Files.newDirectoryStream(dir).iterator().asScala
-      moduleLink <- Files.list(pkg).iterator.asScala
-    } {
-      val module =
-        if (!Files.isSymbolicLink(moduleLink)) moduleLink
-        else Files.readSymbolicLink(moduleLink)
-      Files.walkFileTree(
-        module,
-        new SimpleFileVisitor[Path] {
-          private var activeDirectory: String = ""
-          override def preVisitDirectory(
-              dir: Path,
-              attrs: BasicFileAttributes
-          ): FileVisitResult = {
-            activeDirectory =
-              module.relativize(dir).iterator().asScala.mkString("", "/", "/")
-            if (isExcludedPackage(activeDirectory)) {
-              FileVisitResult.SKIP_SUBTREE
-            } else {
-              FileVisitResult.CONTINUE
-            }
-          }
-          override def visitFile(
-              file: Path,
-              attrs: BasicFileAttributes
-          ): FileVisitResult = {
-            val filename = file.getFileName.toString
-            if (filename.endsWith(".class")) {
-              addMember(activeDirectory, filename)
-            }
-            FileVisitResult.CONTINUE
-          }
-        }
-      )
-    }
+  private def expandJrtClasspath(
+      javaHome: Path,
+      isExcludedPackage: String => Boolean
+  ): Unit = {
+
+    val modsDir = javaHome.resolve("jmods")
+    val modFiles = Files
+      .list(modsDir)
+      .iterator()
+      .asScala
+      // case-insensitive comparison?
+      .filter(_.getFileName.toString.endsWith(".jmod"))
+      .filter(Files.isRegularFile(_))
+      .toVector
+
+    for (modFile <- modFiles)
+      visit(modFile, isExcludedPackage)
   }
 
 }
@@ -231,7 +216,7 @@ object PackageIndex {
   ): PackageIndex = {
     val packages = new PackageIndex()
     packages.visitBootClasspath(javaHome, isExcludedPackage)
-    classpath.foreach { path => packages.visit(path) }
+    classpath.foreach { path => packages.visit(path, isExcludedPackage) }
     packages
   }
   def bootClasspath: List[Path] =
