@@ -511,7 +511,12 @@ val mtagsSettings = List(
   libraryDependencies ++= pprintDebuggingDependency,
   buildInfoPackage := "scala.meta.internal.mtags",
   buildInfoKeys := Seq[BuildInfoKey](
-    "scalaCompilerVersion" -> scalaVersion.value
+    "scalaCompilerVersion" -> scalaVersion.value,
+    "supportedScalaVersions" -> V.supportedScalaVersions,
+    "supportedScalaBinaryVersions" -> V.supportedScalaBinaryVersions,
+    "scala212" -> V.scala212,
+    "scala213" -> V.scala213,
+    "scala3" -> V.scala3,
   ),
   Compile / unmanagedSourceDirectories := {
     val current = (Compile / unmanagedSourceDirectories).value
@@ -789,7 +794,6 @@ lazy val metals = project
       "sbtJdiToolsVersion" -> V.sbtJdiTools,
       "supportedScalaVersions" -> V.supportedScalaVersions,
       "minimumSupportedSbtVersion" -> V.minimumSupportedSbtVersion,
-      "supportedScalaBinaryVersions" -> V.supportedScalaBinaryVersions,
       "scala212" -> V.scala212,
       "bazelScalaVersion" -> V.bazelScalaVersion,
       "scala213" -> V.scala213,
