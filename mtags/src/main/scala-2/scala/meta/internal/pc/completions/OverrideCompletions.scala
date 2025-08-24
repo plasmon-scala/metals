@@ -12,6 +12,7 @@ import scala.meta.internal.pc.MetalsGlobal
 import scala.meta.pc.PresentationCompilerConfig.OverrideDefFormat
 
 import org.eclipse.{lsp4j => l}
+import scala.meta.internal.mtags.GlobalSymbolIndex
 
 trait OverrideCompletions { this: MetalsGlobal =>
 
@@ -53,6 +54,7 @@ trait OverrideCompletions { this: MetalsGlobal =>
    * @param isCandidate the determination of whether the symbol will be a possible completion item.
    */
   case class OverrideCompletion(
+      module: GlobalSymbolIndex.Module,
       name: Name,
       t: Template,
       pos: Position,
@@ -71,6 +73,7 @@ trait OverrideCompletions { this: MetalsGlobal =>
         Nil
       } else {
         val overrideMembers = getMembers(
+          module,
           typed,
           range,
           pos,
@@ -126,6 +129,7 @@ trait OverrideCompletions { this: MetalsGlobal =>
   }
 
   private def getMembers(
+      module: GlobalSymbolIndex.Module,
       typed: Tree,
       range: l.Range,
       pos: Position,
@@ -223,7 +227,7 @@ trait OverrideCompletions { this: MetalsGlobal =>
         sym,
         history,
         info,
-        includeDocs = resolveNames,
+        moduleIfIncludeDocs = if (resolveNames) Some(module) else None,
         includeDefaultParam = false,
         printLongType = false
       )
@@ -333,7 +337,11 @@ trait OverrideCompletions { this: MetalsGlobal =>
   private def isVarSetter(sym: Symbol): Boolean =
     !sym.isStable && !sym.isLazy && sym.isAccessor
 
-  def implementAllAt(pos: Position, text: String)(implicit
+  def implementAllAt(
+      module: GlobalSymbolIndex.Module,
+      pos: Position,
+      text: String
+  )(implicit
       queryInfo: PcQueryContext
   ): List[l.TextEdit] = {
 
@@ -342,6 +350,7 @@ trait OverrideCompletions { this: MetalsGlobal =>
     ): List[l.TextEdit] = {
       val typed = typedTreeAt(t.pos)
       implementAll(
+        module,
         typed,
         inferEditPosition(text, t).toLsp,
         t,
@@ -381,6 +390,7 @@ trait OverrideCompletions { this: MetalsGlobal =>
    * @return the list of TextEdit of both method implementations and auto imports.
    */
   private def implementAll(
+      module: GlobalSymbolIndex.Module,
       typed: Tree,
       range: l.Range,
       t: Template,
@@ -388,6 +398,7 @@ trait OverrideCompletions { this: MetalsGlobal =>
       isCandidate: Symbol => Boolean
   )(implicit queryInfo: PcQueryContext): List[l.TextEdit] = {
     val overrideMembers = getMembers(
+      module,
       typed,
       range,
       t.pos,

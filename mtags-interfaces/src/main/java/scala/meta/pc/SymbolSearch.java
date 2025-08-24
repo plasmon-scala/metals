@@ -14,25 +14,25 @@ public interface SymbolSearch {
      * Returns the documentation of this symbol, if any.
      */
     @Deprecated
-    Optional<SymbolDocumentation> documentation(String symbol, ParentSymbols parents, java.util.function.Consumer<String> logger);
+    Optional<SymbolDocumentation> documentation(String moduleString, String symbol, ParentSymbols parents, java.util.function.Consumer<String> logger);
 
     /**
      * Returns the documentation of this symbol, if any.
      */
-    default Optional<SymbolDocumentation> documentation(String symbol, ParentSymbols parents, ContentType contentType, java.util.function.Consumer<String> logger) {
-        return documentation(symbol, parents, logger);
+    default Optional<SymbolDocumentation> documentation(String moduleString, String symbol, ParentSymbols parents, ContentType contentType, java.util.function.Consumer<String> logger) {
+        return documentation(moduleString, symbol, parents, logger);
     }
 
     /**
      * Returns the definition of this symbol, if any.
      */
-    List<Location> definition(String symbol, URI sourceUri);
+    List<Location> definition(String moduleString, String symbol, URI sourceUri);
 
     /**
      * Returns the all symbols in the file where the given symbol is defined
      * in declaration order, if any.
      */
-    List<String> definitionSourceToplevels(String symbol, URI sourceUri);
+    List<String> definitionSourceToplevels(String moduleString, String symbol, URI sourceUri);
 
     /**
      * Runs fuzzy symbol search for the given query.
@@ -49,7 +49,7 @@ public interface SymbolSearch {
      * like "StreamHandler" may produce more search results.
      */
     Result search(String query,
-                  String buildTargetIdentifier,
+                  String moduleString,
                   SymbolSearchVisitor visitor,
                   SourcePathContext ctx);
     Result searchMethods(String query,

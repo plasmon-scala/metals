@@ -39,10 +39,11 @@ class JavaHoverProvider(
     logger: java.util.function.Consumer[String]
 ) {
 
-  def hover(): Option[HoverSignature] = params match {
-    case range: RangeParams => range.trimWhitespaceInRange.flatMap(hoverOffset)
+  def hover(moduleString: String): Option[HoverSignature] = params match {
+    case range: RangeParams =>
+      range.trimWhitespaceInRange.flatMap(hoverOffset(moduleString, _))
     case _ if isWhitespace => None
-    case _ => hoverOffset(params)
+    case _ => hoverOffset(moduleString, params)
   }
 
   private def isWhitespace: Boolean = {
@@ -51,7 +52,10 @@ class JavaHoverProvider(
     params.text().charAt(params.offset()).isWhitespace
   }
 
-  def hoverOffset(params: OffsetParams): Option[HoverSignature] = {
+  def hoverOffset(
+      moduleString: String,
+      params: OffsetParams
+  ): Option[HoverSignature] = {
     val task: JavacTask =
       compiler.compilationTask(params.text(), params.uri())
     val scanner = JavaMetalsGlobal.scanner(task)
@@ -70,7 +74,7 @@ class JavaHoverProvider(
       element = Trees.instance(task).getElement(n)
       docs =
         if (compiler.metalsConfig.isHoverDocumentationEnabled)
-          documentation(element, types, elements)
+          documentation(moduleString, element, types, elements)
         else ""
       hover <- hoverType(element, docs)
     } yield hover
@@ -177,6 +181,7 @@ class JavaHoverProvider(
   }
 
   private def documentation(
+      moduleString: String,
       element: Element,
       types: Types,
       elements: Elements
@@ -184,6 +189,7 @@ class JavaHoverProvider(
     val sym = semanticdbSymbol(element)
     compiler.search
       .documentation(
+        moduleString,
         sym,
         new ParentSymbols {
           override def parents(): util.List[String] = {

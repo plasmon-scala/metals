@@ -12,8 +12,6 @@ import java.util.logging.Level
 import java.util.logging.Logger
 
 import scala.annotation.tailrec
-import scala.util.Failure
-import scala.util.Success
 import scala.util.Try
 import scala.util.control.NonFatal
 import scala.{meta => m}
@@ -228,33 +226,34 @@ trait ScalametaCommonEnrichments extends CommonMtagsEnrichments {
   }
 
   implicit class XtensionInputVirtual(input: Input.VirtualFile) {
-    def filename: String = {
-      Try {
-        val uri = URI.create(input.path)
-        Paths.get(uri).filename
-      } match {
-        case Failure(exception) =>
-          scribe.warn(
-            s"Error getting filename of ${input.path} via a URI",
-            exception
-          )
-          Try {
-            Paths.get(input.path).filename
-          } match {
-            case Failure(exception) =>
-              logger.warning(exception.getMessage())
-              scribe.warn(
-                s"Error getting filename of ${input.path} via a URI and a NIO path",
-                exception
-              )
-              input.path.reverse.takeWhile(c => c != '/' && c != '\\').reverse
-            case Success(value) =>
-              value
-          }
-        case Success(value) =>
-          value
-      }
-    }
+    def filename: String =
+      if (input.path.startsWith("jar:") && input.path.contains("!/")) {
+        val pathInZip =
+          new URI(input.path).getRawSchemeSpecificPart.split("!/").apply(1)
+        pathInZip.split("/").last
+      } else if (input.path.startsWith("file:/"))
+        Paths.get(new URI(input.path)).getFileName.toString
+      else
+        try {
+          val uri = URI.create(input.path)
+          Paths.get(uri).filename
+        } catch {
+          case NonFatal(exception) =>
+            scribe.warn(
+              s"Error getting filename of ${input.path} via a URI",
+              exception
+            )
+            try Paths.get(input.path).filename
+            catch {
+              case NonFatal(exception) =>
+                logger.warning(exception.getMessage())
+                scribe.warn(
+                  s"Error getting filename of ${input.path} via a URI and a NIO path",
+                  exception
+                )
+                input.path.reverse.takeWhile(c => c != '/' && c != '\\').reverse
+            }
+        }
   }
 
   implicit class XtensionStringDocMeta(doc: String) {

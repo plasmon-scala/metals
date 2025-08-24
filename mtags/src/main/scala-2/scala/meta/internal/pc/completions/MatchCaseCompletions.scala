@@ -8,6 +8,7 @@ import scala.collection.mutable.ListBuffer
 
 import scala.meta.internal.jdk.CollectionConverters._
 import scala.meta.internal.metals.PcQueryContext
+import scala.meta.internal.mtags.GlobalSymbolIndex
 import scala.meta.internal.mtags.MtagsEnrichments._
 import scala.meta.internal.pc.CompletionFuzzy
 import scala.meta.internal.pc.MetalsGlobal
@@ -30,6 +31,7 @@ trait MatchCaseCompletions { this: MetalsGlobal =>
    *               it's `EmptyTree`.
    */
   case class CaseKeywordCompletion(
+      module: GlobalSymbolIndex.Module,
       selector: Tree,
       editRange: l.Range,
       pos: Position,
@@ -205,7 +207,8 @@ trait MatchCaseCompletions { this: MetalsGlobal =>
             }
             val sealedMembers = members.filter(m => isSealedDesc(m._1))
             val sortedMembers =
-              sortSubclasses(sealedMembers, selectorSym.tpe, source).map(_._2)
+              sortSubclasses(module, sealedMembers, selectorSym.tpe, source)
+                .map(_._2)
 
             sortedMembers match {
               case Nil => edits
@@ -257,6 +260,7 @@ trait MatchCaseCompletions { this: MetalsGlobal =>
    * @param prefix the type of the qualifier being matched.
    */
   case class MatchKeywordCompletion(
+      module: GlobalSymbolIndex.Module,
       prefix: Type,
       editRange: l.Range,
       pos: Position,
@@ -311,7 +315,8 @@ trait MatchCaseCompletions { this: MetalsGlobal =>
 
       // sort subclasses by declaration order
       // see: https://github.com/scalameta/metals-feature-requests/issues/49
-      val sortedSubclasses = sortSubclasses(subclassesResult, tpe, source)
+      val sortedSubclasses =
+        sortSubclasses(module, subclassesResult, tpe, source)
 
       val members = sortedSubclasses.map(_._2)
       val basicMatch = new CasePatternMember(
@@ -361,6 +366,7 @@ trait MatchCaseCompletions { this: MetalsGlobal =>
     }
   }
   private def sortSubclasses(
+      module: GlobalSymbolIndex.Module,
       subclasses: List[(Symbol, TextEditMember)],
       tpe: Type,
       source: URI
@@ -374,7 +380,11 @@ trait MatchCaseCompletions { this: MetalsGlobal =>
       // Read all the symbols in the source that contains
       // the definition of the symbol in declaration order
       val defnSymbols = search
-        .definitionSourceToplevels(semanticdbSymbol(tpe.typeSymbol), source)
+        .definitionSourceToplevels(
+          module.asString,
+          semanticdbSymbol(tpe.typeSymbol),
+          source
+        )
         .asScala
       if (defnSymbols.length > 0) {
         val symbolIdx = defnSymbols.zipWithIndex.toMap

@@ -33,9 +33,15 @@ trait GlobalSymbolIndex {
    *  }}}
    * @return the definition of the symbol, if any.
    */
-  def definition(symbol: mtags.Symbol): Option[SymbolDefinition]
+  def definition(
+      module: GlobalSymbolIndex.Module,
+      symbol: mtags.Symbol
+  ): Option[SymbolDefinition]
 
-  def definitions(symbol: mtags.Symbol): List[SymbolDefinition]
+  def definitions(
+      module: GlobalSymbolIndex.Module,
+      symbol: mtags.Symbol
+  ): List[SymbolDefinition]
 
   /**
    * Add an individual Java or Scala source file to the index.
@@ -52,6 +58,7 @@ trait GlobalSymbolIndex {
    *                   literal.
    */
   def addSourceFile(
+      module: GlobalSymbolIndex.Module,
       file: SourcePath,
       dialect: Dialect
   )(implicit ctx: SourcePath.Context): Option[IndexingResult]
@@ -85,6 +92,7 @@ trait GlobalSymbolIndex {
    *                   literal.
    */
   def addSourceJar(
+      module: GlobalSymbolIndex.Module,
       jar: AbsolutePath,
       dialect: Dialect
   )(implicit ctx: SourcePath.Context): List[IndexingResult]
@@ -97,6 +105,7 @@ trait GlobalSymbolIndex {
    * The same as `addSourceJar` except for directories
    */
   def addSourceDirectory(
+      module: GlobalSymbolIndex.Module,
       dir: AbsolutePath,
       dialect: Dialect
   ): List[IndexingResult]
@@ -111,6 +120,29 @@ trait GlobalSymbolIndex {
       topLevelSymbol: mtags.Symbol
   )(implicit ctx: SourcePath.Context): List[(SourcePath, Dialect)]
 
+}
+
+object GlobalSymbolIndex {
+  sealed abstract class Module extends Product with Serializable {
+    def asString: String
+    def targetId: String
+  }
+  object Module {
+    def fromString(moduleString: String): Module =
+      if (moduleString.startsWith("buildTarget:"))
+        BuildTarget(moduleString.stripPrefix("buildTarget:"))
+      else if (moduleString.startsWith("standalone:"))
+        Standalone(moduleString.stripPrefix("standalone:"))
+      else
+        sys.error(s"Unrecognized module kind: '$moduleString'")
+  }
+  final case class BuildTarget(targetId: String) extends Module {
+    def asString: String = s"buildTarget:$targetId"
+  }
+  final case class Standalone(scalaVersion: String) extends Module {
+    def asString: String = s"standalone:$scalaVersion"
+    def targetId: String = asString
+  }
 }
 
 case class SymbolDefinition(
