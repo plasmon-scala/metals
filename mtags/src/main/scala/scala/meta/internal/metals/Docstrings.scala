@@ -171,7 +171,7 @@ class Docstrings(
   def expireSymbolDefinition(
       module: GlobalSymbolIndex.Module,
       path: AbsolutePath,
-      dialect: Dialect
+      dialectOpt: Option[Dialect]
   ): Unit = {
     // fast path for initial sync when the cache is empty. The slow path
     // parses the source file to find out what top levels need to be removed
@@ -181,7 +181,8 @@ class Docstrings(
 
     path.toLanguage match {
       case Language.SCALA =>
-        new Deindexer(module, path.toInput, dialect).indexRoot()
+        for (dialect <- dialectOpt)
+          new Deindexer(module, path.toInput, dialect).indexRoot()
       case _ =>
     }
   }

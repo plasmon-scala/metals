@@ -217,13 +217,23 @@ final class OnDemandSymbolIndex(
       source: SourcePath,
       toplevel: String,
       dialectOpt: Option[Dialect]
-  ): Unit =
-    getOrCreateBucket(dialectOpt, module).addToplevelSymbol(
-      path,
-      module,
-      source,
-      toplevel
-    )
+  ): Unit = {
+    val mainBucket = getOrCreateBucket(dialectOpt, module)
+    val dependencies = dependsOn.getOrElse(module, Set.empty)
+    def buckets = Iterator(mainBucket) ++ dialectBuckets.iterator
+      .collect {
+        case ((_, mod), bucket) if dependencies.contains(mod) =>
+          bucket
+      }
+
+    for (bucket <- buckets)
+      bucket.addToplevelSymbol(
+        path,
+        module,
+        source,
+        toplevel
+      )
+  }
 
   private def tryRun[A](path: String, fallback: => A, thunk: => A): A =
     try thunk
