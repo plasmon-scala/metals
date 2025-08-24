@@ -54,6 +54,8 @@ class ScaladocIndexer(
     // Register `@define` macros to use for expanding in later docstrings.
     defines ++= ScaladocParser.extractDefines(docstring)
     val comment = ScaladocParser.parseComment(docstring, defines)
+    // scribe.info(s"comment=" + pprint.apply(comment))
+    // scribe.info(s"docstring=" + pprint.apply(docstring))
     val docstringContent = printer.toText(comment, docstring)
     def param(name: String, default: String): SymbolDocumentation = {
       val paramDoc = comment.valueParams
@@ -149,6 +151,7 @@ object ScaladocIndexer {
       dialect: Dialect,
       contentType: ContentType
   )(fn: SymbolDocumentation => Unit): Unit = {
+    scribe.info(s"ScaladocIndexer: indexing ${input.path}")
     new ScaladocIndexer(input, fn, dialect, contentType).indexRoot()
   }
 

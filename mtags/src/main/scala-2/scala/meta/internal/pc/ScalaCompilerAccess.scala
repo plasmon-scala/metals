@@ -64,7 +64,16 @@ class ScalaCompilerAccess(
   def latestException(): Option[(Option[String], Throwable)] =
     latestExceptionOpt
 
-  def newReporter = new StoreReporter
+  def newReporter: StoreReporter = new StoreReporter {
+    override def doReport(
+        pos: scala.reflect.internal.util.Position,
+        msg: String,
+        severity: Severity
+    ): Unit = {
+      System.err.println(s"$severity [$pos] $msg")
+      super.doReport(pos, msg, severity)
+    }
+  }
 
   protected def handleSharedCompilerException(
       t: Throwable

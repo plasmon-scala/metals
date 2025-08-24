@@ -184,6 +184,7 @@ class Docstrings(
       doc: SymbolDocumentation,
       contentType: ContentType
   ): Unit = {
+    // scribe.info("doc=" + pprint.apply(doc))
     cache((Content.from(doc.symbol(), contentType), module)) = doc
   }
 
