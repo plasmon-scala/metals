@@ -1,5 +1,6 @@
 package scala.meta.internal.metals
 
+import java.nio.file.Path
 import java.util.Optional
 import java.util.logging.Level
 import java.util.logging.Logger
@@ -199,9 +200,10 @@ class Docstrings(index: GlobalSymbolIndex)(implicit rc: ReportContext) {
 }
 
 object Docstrings {
-  def empty(implicit rc: ReportContext): Docstrings = new Docstrings(
-    OnDemandSymbolIndex.empty()
-  )
+  def empty(javaHome: Path)(implicit rc: ReportContext): Docstrings =
+    new Docstrings(
+      OnDemandSymbolIndex.empty(javaHome)
+    )
 }
 
 sealed trait Content extends Any

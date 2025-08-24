@@ -1,5 +1,6 @@
 package scala.meta.internal.mtags
 
+import java.nio.file.Path
 import java.util.zip.ZipError
 import java.util.zip.ZipException
 
@@ -28,7 +29,8 @@ import scala.meta.pc.reports.ReportContext
 final class OnDemandSymbolIndex(
     dialectBuckets: TrieMap[Dialect, SymbolIndexBucket],
     onError: PartialFunction[Throwable, Unit],
-    toIndexSource: AbsolutePath => AbsolutePath
+    toIndexSource: AbsolutePath => AbsolutePath,
+    javaHome: Path
 )(implicit rc: ReportContext)
     extends GlobalSymbolIndex {
   val mtags = new Mtags
@@ -41,7 +43,13 @@ final class OnDemandSymbolIndex(
   private def getOrCreateBucket(dialect: Dialect): SymbolIndexBucket =
     dialectBuckets.getOrElseUpdate(
       dialect,
-      SymbolIndexBucket.empty(dialect, mtags, toIndexSource, onError)
+      SymbolIndexBucket.empty(
+        dialect,
+        mtags,
+        toIndexSource,
+        onError,
+        javaHome
+      )
     )
 
   override def definition(symbol: Symbol): Option[SymbolDefinition] = {
@@ -156,12 +164,18 @@ final class OnDemandSymbolIndex(
 object OnDemandSymbolIndex {
 
   def empty(
+      javaHome: Path,
       onError: PartialFunction[Throwable, Unit] = { case e: Throwable =>
         throw e
       },
       toIndexSource: AbsolutePath => AbsolutePath = identity
   )(implicit rc: ReportContext): OnDemandSymbolIndex = {
-    new OnDemandSymbolIndex(TrieMap.empty, onError, toIndexSource)
+    new OnDemandSymbolIndex(
+      TrieMap.empty,
+      onError,
+      toIndexSource,
+      javaHome
+    )
   }
 
 }
