@@ -11,6 +11,7 @@ import scala.meta.pc.SymbolDocumentation
 
 import org.eclipse.{lsp4j => l}
 import scala.meta.internal.mtags.GlobalSymbolIndex
+import scala.util.control.NonFatal
 
 trait Signatures { compiler: MetalsGlobal =>
 
@@ -60,7 +61,15 @@ trait Signatures { compiler: MetalsGlobal =>
         renames = renamedSymbols(scope),
         config = renameConfig
       )
-      val tpeString = shortType(tpe, history).toString()
+      val tpeString = {
+        val tpe0 = shortType(tpe, history)
+        try tpe0.toString()
+        catch {
+          case NonFatal(e) =>
+            scribe.warn("Ignoring exception", e)
+            "?"
+        }
+      }
       val edits = history.autoImports(pos, importPosition)
       (tpeString, edits)
     }
