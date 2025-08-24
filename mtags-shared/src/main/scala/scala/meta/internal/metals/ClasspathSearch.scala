@@ -79,16 +79,16 @@ object ClasspathSearch {
     new ClasspathSearch(Array.empty)
 
   def fromClasspath(
-      classpath: collection.Seq[Path],
+      indices: collection.Seq[PackageIndex],
       excludePackages: ExcludedPackagesHandler,
       javaHome: Path,
       bucketSize: Int = CompressedPackageIndex.DefaultBucketSize
   ): ClasspathSearch =
-    Indexer.default.index(classpath, excludePackages, javaHome, bucketSize)
+    Indexer.default.index(indices, excludePackages, javaHome, bucketSize)
 
   trait Indexer {
     def index(
-        classpath: collection.Seq[Path],
+        indices: collection.Seq[PackageIndex],
         excludePackages: ExcludedPackagesHandler,
         javaHome: Path,
         bucketSize: Int = CompressedPackageIndex.DefaultBucketSize
@@ -98,14 +98,9 @@ object ClasspathSearch {
   object Indexer {
 
     val default: Indexer =
-      (classpath, excludePackages, javaHome, bucketSize) => {
-        val packages = PackageIndex.fromClasspath(
-          classpath,
-          excludePackages.isExcludedPackage,
-          javaHome
-        )
+      (indices, excludePackages, javaHome, bucketSize) => {
         val map = CompressedPackageIndex.fromPackages(
-          packages,
+          indices.toVector,
           excludePackages.isExcludedPackage,
           bucketSize
         )
