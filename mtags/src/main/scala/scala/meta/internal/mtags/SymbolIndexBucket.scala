@@ -5,17 +5,20 @@ import java.nio.CharBuffer
 import java.util.logging.Level
 import java.util.logging.Logger
 
-import scala.util.Properties
 import scala.util.control.NonFatal
 
 import scala.meta.Dialect
 import scala.meta.internal.io.FileIO
 import scala.meta.internal.io.PathIO
 import scala.meta.internal.io.PlatformFileIO
+import scala.meta.internal.metals.JdkVersion0
 import scala.meta.internal.mtags.ScalametaCommonEnrichments._
 import scala.meta.internal.semanticdb.Scala._
 import scala.meta.internal.{semanticdb => s}
 import scala.meta.io.AbsolutePath
+import java.nio.file.Path
+import java.nio.file.Files
+import java.util.zip.ZipFile
 
 final case class SymbolLocation(
     path: AbsolutePath,
@@ -41,7 +44,8 @@ class SymbolIndexBucket(
     toIndexSource: AbsolutePath => AbsolutePath = identity,
     mtags: Mtags,
     dialect: Dialect,
-    onError: PartialFunction[Throwable, Unit]
+    onError: PartialFunction[Throwable, Unit],
+    javaHome: Path
 ) {
 
   private val logger = Logger.getLogger(classOf[SymbolIndexBucket].getName)
@@ -356,28 +360,42 @@ class SymbolIndexBucket(
     )
   }
 
-  private def modulePaths(toplevel: Symbol): List[String] = {
-    if (Properties.isJavaAtLeast("9")) {
-      val noExtension = toplevel.value.stripSuffix(".").stripSuffix("#")
-      val javaSymbol = noExtension.replace("/", ".")
-      for {
-        cls <- sourceJars.loadClassSafe(javaSymbol).toList
-        // note(@tgodzik) Modules are only available in Java 9+, so we need to invoke this reflectively
-        module <- Option(
-          cls.getClass().getMethod("getModule").invoke(cls)
-        ).toList
-        moduleName <- Option(
-          module.getClass().getMethod("getName").invoke(module)
-        ).toList
-        file <- List(
-          s"$moduleName/$noExtension.java",
-          s"$moduleName/$noExtension.scala"
-        )
-      } yield file
-    } else {
-      Nil
+  private lazy val modules = {
+    val srcZipCandidates =
+      Seq(javaHome.resolve("src.zip"), javaHome.resolve("lib/src.zip"))
+    val srcZip = srcZipCandidates.filter(Files.exists(_)).headOption.getOrElse {
+      sys.error(s"src.zip not found among $srcZipCandidates")
+    }
+    val zf = new ZipFile(srcZip.toFile)
+    try {
+      import scala.jdk.CollectionConverters._
+      zf.entries()
+        .asScala
+        .map(_.getName)
+        .filter(_.endsWith("/module-info.java"))
+        .map(_.stripSuffix("/module-info.java"))
+        .filter(!_.contains("/"))
+        .toList
+    } finally {
+      zf.close()
     }
   }
+
+  private lazy val javaVer =
+    JdkVersion0.fromJavaHome(javaHome).getOrElse {
+      sys.error(s"Cannot get Java version of $javaHome")
+    }
+  private def modulePaths(toplevel: Symbol): List[String] =
+    if (javaVer.major >= 9) {
+      val noExtension = toplevel.value.stripSuffix(".").stripSuffix("#")
+      modules.flatMap { module =>
+        List(
+          s"$module/$noExtension.java",
+          s"$module/$noExtension.scala"
+        )
+      }
+    } else
+      Nil
 }
 
 object SymbolIndexBucket {
@@ -386,7 +404,8 @@ object SymbolIndexBucket {
       dialect: Dialect,
       mtags: Mtags,
       toIndexSource: AbsolutePath => AbsolutePath,
-      onError: PartialFunction[Throwable, Unit]
+      onError: PartialFunction[Throwable, Unit],
+      javaHome: Path
   ): SymbolIndexBucket =
     new SymbolIndexBucket(
       AtomicTrieMap.empty,
@@ -395,7 +414,8 @@ object SymbolIndexBucket {
       toIndexSource,
       mtags,
       dialect,
-      onError
+      onError,
+      javaHome
     )
 
 }
