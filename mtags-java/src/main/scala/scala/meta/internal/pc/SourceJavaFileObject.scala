@@ -14,7 +14,7 @@ object SourceJavaFileObject {
     // parent `javax.tools.SimpleJavaObject` fails if URI doesn't have path
     val relativeUri =
       if (uri.getScheme() == "jar") {
-        val parts = uri.getSchemeSpecificPart().split("!")
+        val parts = uri.getRawSchemeSpecificPart().split("!")
         if (parts.length == 2) URI.create(parts(1)) else uri
       } else uri
 
