@@ -237,6 +237,7 @@ lazy val interfaces = project
       "-tag",
       "implNote:a:Implementation Note:",
     ),
+    Compile / doc / sources := Seq.empty,
   )
 
 lazy val mtagsShared = project
@@ -264,6 +265,7 @@ lazy val mtagsShared = project
       "com.outr" %% "scribe" % V.scribe,
       "com.lihaoyi" %% "pprint" % V.pprint,
     ),
+    Compile / doc / sources := Seq.empty,
   )
   .dependsOn(interfaces)
 
@@ -497,6 +499,7 @@ lazy val metals = project
       "latestScala3Next" -> V.latestScala3Next,
       "lastSupportedSemanticdb" -> SemanticDbSupport.last,
     ),
+    Compile / doc / sources := Seq.empty,
   )
   .dependsOn(mtags, `mtags-java`)
   .enablePlugins(BuildInfoPlugin)
