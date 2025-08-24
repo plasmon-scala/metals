@@ -77,7 +77,7 @@ object CompressedPackageIndex {
    *                   compressed package index.
    */
   def fromPackages(
-      packages: PackageIndex,
+      packages: Seq[PackageIndex],
       isExcludedPackage: String => Boolean,
       bucketSize: Int = DefaultBucketSize
   ): Array[CompressedPackageIndex] = {
@@ -122,15 +122,21 @@ object CompressedPackageIndex {
       members.clear()
     }
 
+    val map = packages.flatMap(_.packages.asScala.toSeq).groupBy(_._1).map {
+      case (k, l) =>
+        (k, l.map(_._2))
+    }
     for {
-      (pkg, packageMembers) <- packages.packages.asScala.iterator
+      (pkg, packageMembers) <- map.iterator
       if !isExcludedPackage(pkg)
     } {
       enterPackage(pkg)
 
       // Sort members for deterministic order for deterministic results.
-      val sortedMembers = new ju.ArrayList[String](packageMembers.size())
-      sortedMembers.addAll(packageMembers)
+      val sortedMembers =
+        new ju.ArrayList[String](packageMembers.iterator.map(_.size()).sum)
+      for (elem <- packageMembers)
+        sortedMembers.addAll(elem)
       sortedMembers.sort(String.CASE_INSENSITIVE_ORDER)
 
       sortedMembers.forEach { member =>
