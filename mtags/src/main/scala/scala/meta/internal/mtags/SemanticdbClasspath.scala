@@ -33,7 +33,7 @@ final case class SemanticdbClasspath(
     )
   }
   def semanticdbPath(scalaOrJavaPath: AbsolutePath): Option[AbsolutePath] = {
-    loader.resolve(resourcePath(scalaOrJavaPath).toNIO).map(AbsolutePath.apply)
+    ??? // loader.resolve(resourcePath(scalaOrJavaPath).toNIO).map(AbsolutePath.apply)
   }
 
   def textDocument(scalaOrJavaPath: SourcePath): TextDocumentLookup = {
@@ -44,10 +44,11 @@ final case class SemanticdbClasspath(
       charset,
       fingerprints,
       path =>
-        loader
-          .resolve(path.toNIO)
-          .map(AbsolutePath(_))
-          .map(FoundSemanticDbPath(_, None))
+        // loader
+        //   .resolve(path.toNIO)
+        //   .map(AbsolutePath(_))
+        //   .map(FoundSemanticDbPath(_, None))
+        ???
     )
   }
 }

@@ -1,17 +1,13 @@
 package scala.meta.internal.mtags
 
 import java.nio.CharBuffer
-import java.util.logging.Level
-import java.util.logging.Logger
 
-import scala.jdk.CollectionConverters._
 import scala.util.control.NonFatal
 
 import scala.meta.Dialect
-import scala.meta.internal.io.FileIO
 import scala.meta.internal.io.PlatformFileIO
 import scala.meta.internal.metals.JdkVersion0
-import scala.meta.internal.mtags.ScalametaCommonEnrichments._
+import scala.meta.internal.mtags.MtagsEnrichments._
 import scala.meta.internal.semanticdb.Scala._
 import scala.meta.internal.{semanticdb => s}
 import scala.meta.io.AbsolutePath
@@ -19,152 +15,8 @@ import java.nio.file.Path
 import java.nio.file.Files
 import java.util.zip.ZipFile
 import scala.meta.inputs.Input
-import java.nio.charset.StandardCharsets
-import java.nio.charset.Charset
-import java.net.URI
-import java.nio.file.Paths
-import java.util.concurrent.ConcurrentHashMap
-import java.io.FileNotFoundException
 import scala.meta.pc.reports.ReportContext
-
-final case class SymbolLocation(
-    path: SourcePath,
-    range: Option[s.Range]
-)
-
-sealed abstract class SourcePath extends Product with Serializable {
-  def uri: String
-  def filePath: Option[Path]
-  def content(charSet: Charset = StandardCharsets.UTF_8)(implicit
-      context: SourcePath.Context
-  ): String
-  def toInput(implicit context: SourcePath.Context): Input.VirtualFile =
-    Input.VirtualFile(uri, content())
-
-  def exists()(implicit context: SourcePath.Context): Boolean
-
-  def isScalaScript: Boolean = false
-  def isMill: Boolean = false
-
-  def extension: String
-}
-
-object SourcePath {
-  def apply(uri: String): SourcePath = {
-    val uri0 = new URI(uri)
-    if (uri0.getScheme == "jar" && uri0.getRawSchemeSpecificPart != null)
-      uri0.getRawSchemeSpecificPart.split("!/", 2) match {
-        case Array(zipUri, pathInZip) =>
-          ZipEntry(Paths.get(new URI(zipUri)), pathInZip)
-        case Array(_) =>
-          throw new Exception(
-            s"Malformed jar URI: '$uri' (missing '!' path-in-zip part, like in jar:file://path/to.zip!path/in/zip)"
-          )
-      }
-    else
-      Standard(Paths.get(uri0))
-  }
-
-  final case class Standard(path: Path) extends SourcePath {
-    def uri: String = path.toUri.toASCIIString
-    def filePath: Option[Path] = Some(path)
-    def content(charSet: Charset)(implicit
-        context: SourcePath.Context
-    ): String =
-      FileIO.slurp(AbsolutePath(path), charSet)
-    def exists()(implicit context: SourcePath.Context): Boolean =
-      Files.exists(path)
-    override def isScalaScript: Boolean =
-      path.toString.isScalaScript
-    override def isMill: Boolean =
-      path.toString.isMill
-    def extension: String =
-      AbsolutePath(path).extension
-  }
-  final case class ZipEntry(zipPath: Path, pathInZip: String)
-      extends SourcePath {
-    def uri: String =
-      "jar:" + zipPath.toUri.toASCIIString + "!/" + pathInZip
-    def filePath: Option[Path] = None
-    def content(
-        charSet: Charset
-    )(implicit context: SourcePath.Context): String = {
-      val zf = context.get(zipPath)
-      val ent = zf.getEntry(pathInZip)
-      if (ent == null)
-        throw new FileNotFoundException(uri)
-      new String(zf.getInputStream(ent).readAllBytes(), charSet)
-    }
-    def exists()(implicit context: SourcePath.Context): Boolean =
-      Files.exists(zipPath) && context.get(zipPath).getEntry(pathInZip) != null
-    def extension: String =
-      pathInZip.split('/').last.split('.') match {
-        case Array(_) => ""
-        case other => other.last
-      }
-  }
-
-  final class Context extends AutoCloseable { ctx =>
-    private val map = new ConcurrentHashMap[Path, ZipFile]
-    def get(path: Path): ZipFile =
-      Option(map.get(path)) match {
-        case Some(zf) => zf
-        case None =>
-          val zf = new ZipFile(path.toFile)
-          val previousOpt = Option(map.putIfAbsent(path, zf))
-          previousOpt match {
-            case Some(previous) =>
-              zf.close()
-              previous
-            case None =>
-              zf
-          }
-      }
-    def entries(path: Path): Iterator[ZipEntry] =
-      get(path)
-        .entries()
-        .asScala
-        .filter(!_.getName.endsWith("/"))
-        .map(ent => ZipEntry(path, ent.getName))
-    def close(): Unit =
-      for ((path, zf) <- map.asScala.toVector) {
-        map.remove(path, zf)
-        zf.close()
-      }
-
-    lazy val iface: scala.meta.pc.SourcePathContext =
-      new scala.meta.pc.SourcePathContext {
-        def get(path: Path) = ctx.get(path)
-        def entries(path: Path) =
-          ctx
-            .entries(path)
-            .map(ent =>
-              new java.util.AbstractMap.SimpleEntry(
-                ent.zipPath,
-                ent.pathInZip
-              ): java.util.Map.Entry[Path, String]
-            )
-            .asJava
-        def actualContext(): Object = ctx
-      }
-  }
-
-  object Context {
-    def from(iface: scala.meta.pc.SourcePathContext): Context =
-      iface.actualContext().asInstanceOf[Context]
-  }
-
-  def withContext[T](f: Context => T): T = {
-    var context: Context = null
-    try {
-      context = new Context
-      f(context)
-    } finally {
-      if (context != null)
-        context.close()
-    }
-  }
-}
+import scala.collection.mutable.ListBuffer
 
 /**
  * Index split on buckets per dialect in order to have a constant time
@@ -179,18 +31,25 @@ object SourcePath {
  *                    while definitions contains only symbols generated by ScalaMtags.
  */
 class SymbolIndexBucket(
-    toplevels: AtomicTrieMap[String, Set[SourcePath]],
-    definitions: AtomicTrieMap[String, Set[SymbolLocation]],
-    sourceJars: OpenClassLoader,
+    val toplevels: AtomicTrieMap[String, Set[
+      (SourcePath, Option[Either[AbsolutePath, GlobalSymbolIndex.Module]])
+    ]],
+    val definitions: AtomicTrieMap[String, Set[SymbolLocation]],
+    val sourceJars: OpenClassLoader,
     toIndexSource: AbsolutePath => AbsolutePath = identity,
     mtags: Mtags,
     dialect: Dialect,
     onError: PartialFunction[Throwable, Unit],
     javaHome: Path,
-    javaOnly: Boolean
+    javaOnly: Boolean,
+    addTextDocuments: (
+        Option[Either[AbsolutePath, GlobalSymbolIndex.Module]],
+        SourcePath,
+        s.TextDocuments
+    ) => Unit
 ) {
 
-  private val logger = Logger.getLogger(classOf[SymbolIndexBucket].getName)
+  var logger: java.util.function.Consumer[String] = null
 
   def duplicate(dialect: Dialect, javaOnly: Boolean): SymbolIndexBucket = {
     assert(this.javaOnly || this.dialect == dialect)
@@ -203,37 +62,76 @@ class SymbolIndexBucket(
       dialect,
       onError,
       javaHome,
-      javaOnly
+      javaOnly,
+      addTextDocuments
     )
   }
 
   def close(): Unit = () // sourceJars.close()
 
+  // called for directories in dependency sources
   def addSourceDirectory(
+      module: GlobalSymbolIndex.Module,
       dir: AbsolutePath
   )(implicit rc: ReportContext): List[IndexingResult] = {
     if (sourceJars.addEntry(dir.toNIO)) {
-      dir.listRecursive.toList.flatMap {
-        case source if source.isScala =>
-          addSourceFile(source.toInput, isJava = false)
-        case source if source.isJava =>
-          addJavaSourceFile(source.toInput) match {
-            case Nil => None
-            case topLevels =>
-              Some(
-                IndexingResult(
-                  SourcePath.Standard(source.toNIO),
-                  topLevels,
-                  overrides = Nil
-                )
-              )
-          }
-        case _ =>
-          None
+      val sources = dir.listRecursive.toVector
+      val scalaSources = ListBuffer.empty[AbsolutePath]
+      val javaSources = ListBuffer.empty[AbsolutePath]
+      for (source <- sources) {
+        if (source.isScala)
+          scalaSources += source
+        else if (source.isJava)
+          javaSources += source
       }
-    } else List.empty
+      if (logger != null && (scalaSources.nonEmpty || javaSources.nonEmpty))
+        logger.accept {
+          "Indexing " +
+            Seq(
+              if (scalaSources.isEmpty) Nil
+              else
+                Seq(
+                  s"${scalaSources.length} Scala ${if (scalaSources.length == 1) "source"
+                    else "sources"}"
+                ),
+              if (javaSources.isEmpty) Nil
+              else
+                Seq(s"${javaSources.length} Java ${if (javaSources.length == 1) "source"
+                  else "sources"}")
+            ).flatten.mkString(" and ") +
+            s" under $dir"
+        }
+      def scalaResults = scalaSources.iterator
+        .flatMap { scalaSource =>
+          addSourceFile(
+            Some(Left(dir)),
+            scalaSource.toInput,
+            isJava = false
+          ).iterator
+        }
+      def javaResults = javaSources.iterator
+        .flatMap { javaSource =>
+          val topLevels = addJavaSourceFile(Some(Left(dir)), javaSource.toInput)
+          if (topLevels.isEmpty) Iterator.empty
+          else
+            Iterator(
+              IndexingResult(
+                SourcePath.Standard(javaSource.toNIO),
+                topLevels,
+                overrides = Nil
+              )
+            )
+        }
+      (scalaResults ++ javaResults).toList
+    } else {
+      if (logger != null)
+        logger.accept(s"$dir directory already indexed")
+      List.empty
+    }
   }
 
+  // called for JDK sources (standard modules) and Scala library sources (standalone modules)
+  // TODO use addIndexedSourceJar instead?
   def addSourceJar(
       jar: AbsolutePath,
       isPureJava: Boolean = false
@@ -246,10 +144,10 @@ class SymbolIndexBucket(
         .entries(jar.toNIO)
         .flatMap { source =>
           if (source.uri.endsWith(".scala") && !isPureJava)
-            addSourceFile(source.toInput, isJava = false)
+            addSourceFile(None, source.toInput, isJava = false)
           else if (source.uri.endsWith(".java"))
             // addSourceFile(source.toInput, isJava = true) // ?
-            addJavaSourceFile(source.toInput) match {
+            addJavaSourceFile(None, source.toInput) match {
               case Nil => None
               case topLevels =>
                 Some(IndexingResult(source, topLevels, overrides = Nil))
@@ -262,6 +160,7 @@ class SymbolIndexBucket(
       List.empty
   }
 
+  // not called anymore (???)
   def indexSourceJar(jar: AbsolutePath, isJava: Boolean)(implicit
       ctx: SourcePath.Context
   ): List[IndexingResult] =
@@ -271,15 +170,16 @@ class SymbolIndexBucket(
       .map(source => indexSource(source.toInput, isJava = isJava))
       .toList
 
+  // called for cached JARs in dependency sources
   def addIndexedSourceJar(
       jar: AbsolutePath,
-      symbols: List[(String, SourcePath)]
+      symbols: List[(String, SourcePath.ZipEntry)]
   ): Unit = {
     if (sourceJars.addEntry(jar.toNIO)) {
       symbols.foreach { case (sym, path) =>
         toplevels.updateWith(sym) {
-          case Some(acc) => Some(acc + path)
-          case None => Some(Set(path))
+          case Some(acc) => Some(acc + (path -> None))
+          case None => Some(Set(path -> None))
         }
       }
     }
@@ -290,7 +190,8 @@ class SymbolIndexBucket(
    * in that case java toplevel is not "trivial".
    * See: https://github.com/scalameta/metals/issues/3815
    */
-  def addJavaSourceFile(
+  private def addJavaSourceFile(
+      originOpt: Option[Either[AbsolutePath, GlobalSymbolIndex.Module]],
       input: Input.VirtualFile
   )(implicit rc: ReportContext): List[String] = {
     new JavaToplevelMtags(
@@ -313,15 +214,16 @@ class SymbolIndexBucket(
         if (isTrivialToplevelSymbol0) Nil
         else {
           toplevels.updateWith(symbol) {
-            case Some(acc) => Some(acc + SourcePath(input.path))
-            case None => Some(Set(SourcePath(input.path)))
+            case Some(acc) => Some(acc + (SourcePath(input.path) -> originOpt))
+            case None => Some(Set(SourcePath(input.path) -> originOpt))
           }
           List(symbol)
         }
     }
   }
 
-  def addSourceFile(
+  private def addSourceFile(
+      originOpt: Option[Either[AbsolutePath, GlobalSymbolIndex.Module]],
       input: Input.VirtualFile,
       isJava: Boolean
   ): Option[IndexingResult] = try {
@@ -329,8 +231,8 @@ class SymbolIndexBucket(
       indexSource(input, isJava)
     topLevels.foreach { symbol =>
       toplevels.updateWith(symbol) {
-        case Some(acc) => Some(acc + SourcePath(input.path))
-        case None => Some(Set(SourcePath(input.path)))
+        case Some(acc) => Some(acc + (SourcePath(input.path) -> originOpt))
+        case None => Some(Set(SourcePath(input.path) -> originOpt))
       }
     }
     Some(IndexingResult(path, topLevels, overrides))
@@ -340,6 +242,7 @@ class SymbolIndexBucket(
       None
   }
 
+  // called for not-yet-cached entries of JARs in dependency sources (TODO use indexSourceJar instead?)
   def indexSource(
       input: Input.VirtualFile,
       isJava: Boolean
@@ -383,15 +286,17 @@ class SymbolIndexBucket(
     pathBuffer.equals(symbolBuffer)
   }
 
+  // called for workspaces sources by indexer and file watcher
   def addToplevelSymbol(
       path: String,
+      module: GlobalSymbolIndex.Module,
       source: SourcePath,
       toplevel: String
   ): Unit = {
     if (source.isScalaScript || !isTrivialToplevelSymbol(path, toplevel)) {
       toplevels.updateWith(toplevel) {
-        case Some(acc) => Some(acc + source)
-        case None => Some(Set(source))
+        case Some(acc) => Some(acc + (source -> Some(Right(module))))
+        case None => Some(Set(source -> Some(Right(module))))
       }
     }
   }
@@ -401,9 +306,9 @@ class SymbolIndexBucket(
   )(implicit ctx: SourcePath.Context): List[(SourcePath, Dialect)] = {
     toplevels
       .get(topLevelSymbol.toString())
-      .map(_.toList)
-      .orElse(loadFromSourceJars(trivialPaths(topLevelSymbol)))
-      .orElse(loadFromSourceJars(modulePaths(topLevelSymbol)))
+      .map(_.toList.map(_._1))
+      .orElse(loadFromSourceJars(trivialPaths(topLevelSymbol)).map(_.map(_._2)))
+      .orElse(loadFromSourceJars(modulePaths(topLevelSymbol)).map(_.map(_._2)))
       .getOrElse(Nil)
       .map(x => (x, dialect))
   }
@@ -438,23 +343,31 @@ class SymbolIndexBucket(
       val files = toplevels.get(toplevel.value)
       files match {
         case Some(files) =>
-          files.map(_.toInput).foreach(addMtagsSourceFile(_))
+          for ((source, originOpt) <- files)
+            addMtagsSourceFile(originOpt, source.toInput)
         case _ =>
-          loadFromSourceJars(trivialPaths(toplevel))
-            .orElse(loadFromSourceJars(modulePaths(toplevel)))
-            .foreach(_.foreach(p => addMtagsSourceFile(p.toInput)))
+          val fromTrivialPaths = loadFromSourceJars(trivialPaths(toplevel))
+          def fromModulePaths = loadFromSourceJars(modulePaths(toplevel))
+          for {
+            list <- fromTrivialPaths.orElse(fromModulePaths)
+            (originOpt, path) <- list
+          } addMtagsSourceFile(
+            originOpt.map(path0 => Left(AbsolutePath(path0))),
+            path.toInput
+          )
       }
       if (!definitions.contains(symbol.value)) {
         // Fallback 2: try with files for companion class
         if (toplevel.value.endsWith(".")) {
           val toplevelAlternative = s"${toplevel.value.stripSuffix(".")}#"
+          lazy val fileSet = files.map(_.map(_._1))
           for {
-            companionClassFile <- toplevels
+            (companionClassFile, originOpt) <- toplevels
               .get(toplevelAlternative)
               .toSet
               .flatten
-            if !files.exists(_.contains(companionClassFile))
-          } addMtagsSourceFile(companionClassFile.toInput)
+            if !fileSet.exists(_.contains(companionClassFile))
+          } addMtagsSourceFile(originOpt, companionClassFile.toInput)
         }
       }
     }
@@ -489,7 +402,10 @@ class SymbolIndexBucket(
       symbol: Symbol
   )(implicit ctx: SourcePath.Context): Unit = {
     val exists =
-      (toplevels.get(symbol.value).getOrElse(Set.empty) ++ definitions
+      (toplevels
+        .get(symbol.value)
+        .map(_.map(_._1))
+        .getOrElse(Set.empty) ++ definitions
         .get(symbol.value)
         .map(_.map(_.path))
         .getOrElse(Set.empty)).filter(_.exists())
@@ -497,7 +413,7 @@ class SymbolIndexBucket(
     toplevels.updateWith(symbol.value) {
       case None => None
       case Some(acc) =>
-        val updated = acc.filter(exists(_))
+        val updated = acc.filter(t => exists(t._1))
         if (updated.isEmpty) None
         else Some(updated)
     }
@@ -540,6 +456,7 @@ class SymbolIndexBucket(
   // similar as addSourceFile except indexes all global symbols instead of
   // only non-trivial toplevel symbols.
   private def addMtagsSourceFile(
+      originOpt: Option[Either[AbsolutePath, GlobalSymbolIndex.Module]],
       input: Input.VirtualFile,
       retry: Boolean = true
   )(implicit ctx: SourcePath.Context): Unit = try {
@@ -551,45 +468,33 @@ class SymbolIndexBucket(
         s.TextDocuments(Nil)
     }
     if (docs.documents.nonEmpty) {
-      addTextDocuments(SourcePath(input.path), docs)
+      addTextDocuments(originOpt, SourcePath(input.path), docs)
     }
   } catch {
     case NonFatal(e) =>
-      logger.log(Level.WARNING, s"Error indexing ${input.path}", e)
-      if (retry) addMtagsSourceFile(input, retry = false)
-  }
-
-  // Records all global symbol definitions.
-  private def addTextDocuments(
-      path: SourcePath,
-      docs: s.TextDocuments
-  ): Unit = {
-    docs.documents.foreach { document =>
-      document.occurrences.foreach { occ =>
-        if (occ.symbol.isGlobal && occ.role.isDefinition) {
-          definitions.updateWith(occ.symbol) {
-            case Some(acc) => Some(acc + SymbolLocation(path, occ.range))
-            case None => Some(Set(SymbolLocation(path, occ.range)))
-          }
-        } else {
-          // do nothing, we only care about global symbol definitions.
-        }
-      }
-    }
+      // logger.log(Level.WARNING, s"Error indexing ${input.path}", e)
+      scribe.error(s"Error indexing ${input.path}", e)
+      if (retry) addMtagsSourceFile(originOpt, input, retry = false)
   }
 
   // Returns the first path that resolves to a file.
   private def loadFromSourceJars(
       paths: List[String]
-  )(implicit ctx: SourcePath.Context): Option[List[SourcePath]] = {
+  )(implicit
+      ctx: SourcePath.Context
+  ): Option[List[(Option[Path], SourcePath)]] = {
     paths match {
       case Nil => None
       case head :: tail =>
         val files = sourceJars
           .list()
           .iterator
-          .map(jar => SourcePath.ZipEntry(jar, head))
-          .filter(ent => ent.exists())
+          .map { path =>
+            if (Files.isDirectory(path))
+              (Some(path), SourcePath.Standard(path.resolve(head)))
+            else (None, SourcePath.ZipEntry(path, head, -1L))
+          }
+          .filter { case (_, ent) => ent.exists() }
           .toList
         if (files.isEmpty) loadFromSourceJars(tail)
         else Some(files)
@@ -655,7 +560,12 @@ object SymbolIndexBucket {
       toIndexSource: AbsolutePath => AbsolutePath,
       onError: PartialFunction[Throwable, Unit],
       javaHome: Path,
-      javaOnly: Boolean
+      javaOnly: Boolean,
+      addTextDocuments: (
+          Option[Either[AbsolutePath, GlobalSymbolIndex.Module]],
+          SourcePath,
+          s.TextDocuments
+      ) => Unit
   ): SymbolIndexBucket =
     new SymbolIndexBucket(
       AtomicTrieMap.empty,
@@ -666,7 +576,8 @@ object SymbolIndexBucket {
       dialect,
       onError,
       javaHome,
-      javaOnly
+      javaOnly,
+      addTextDocuments
     )
 
 }
