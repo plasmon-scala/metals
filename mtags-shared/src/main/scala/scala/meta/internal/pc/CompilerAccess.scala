@@ -177,6 +177,8 @@ abstract class CompilerAccess[Reporter, Compiler](
       thunk: CompilerWrapper[Reporter, Compiler] => T
   )(implicit queryInfo: PcQueryContext): T = {
     try {
+      // if (params.exists(_.text().contains("$make" + " it crash$")))
+      //   throw new Exception("$make" + " it crash$")
       thunk(loadCompiler())
     } catch {
       case InterruptException() =>
