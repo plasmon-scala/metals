@@ -350,17 +350,17 @@ class SymbolIndexBucket(
 
     removeOldEntries(symbol)
 
+    // Fallback 1: enter the toplevel symbol definition
     if (!definitions.contains(symbol.value)) {
-      // Fallback 1: enter the toplevel symbol definition
-      val toplevel = symbol.toplevel
-      val files = toplevels.get(toplevel.value)
-      files match {
+      toplevels.get(symbol.toplevel.value) match {
         case Some(files) =>
           for ((source, originOpt) <- files)
             addMtagsSourceFile(originOpt, source.toInput)
         case _ =>
-          val fromTrivialPaths = loadFromSourceJars(trivialPaths(toplevel))
-          def fromModulePaths = loadFromSourceJars(modulePaths(toplevel))
+          val fromTrivialPaths = loadFromSourceJars(
+            trivialPaths(symbol.toplevel)
+          )
+          def fromModulePaths = loadFromSourceJars(modulePaths(symbol.toplevel))
           for {
             list <- fromTrivialPaths.orElse(fromModulePaths)
             (originOpt, path) <- list
@@ -369,41 +369,39 @@ class SymbolIndexBucket(
             path.toInput
           )
       }
-      if (!definitions.contains(symbol.value)) {
-        // Fallback 2: try with files for companion class
-        if (toplevel.value.endsWith(".")) {
-          val toplevelAlternative = s"${toplevel.value.stripSuffix(".")}#"
-          lazy val fileSet = files.map(_.map(_._1))
-          for {
-            (companionClassFile, originOpt) <- toplevels
-              .get(toplevelAlternative)
-              .toSet
-              .flatten
-            if !fileSet.exists(_.contains(companionClassFile))
-          } addMtagsSourceFile(originOpt, companionClassFile.toInput)
-        }
-      }
     }
-    if (!definitions.contains(symbol.value)) {
-      // Fallback 3: guess related symbols from the enclosing class.
-      DefinitionAlternatives(symbol).flatMap(query0(querySymbol, _))
-    } else {
-      definitions
-        .get(symbol.value)
-        .map { paths =>
-          paths.map { location =>
-            SymbolDefinition(
-              querySymbol = querySymbol,
-              definitionSymbol = symbol,
-              path = location.path,
-              dialectOpt = dialectOpt,
-              range = location.range,
-              kind = None,
-              properties = 0
-            )
-          }.toList
+
+    // Fallback 2: try with files for companion class
+    if (
+      !definitions.contains(symbol.value) && symbol.toplevel.value.endsWith(".")
+    ) {
+      val toplevelAlternative = s"${symbol.toplevel.value.stripSuffix(".")}#"
+      lazy val fileSet = toplevels.get(symbol.toplevel.value).map(_.map(_._1))
+      for {
+        (companionClassFile, originOpt) <- toplevels
+          .get(toplevelAlternative)
+          .toSet
+          .flatten
+        if !fileSet.exists(_.contains(companionClassFile))
+      } addMtagsSourceFile(originOpt, companionClassFile.toInput)
+    }
+
+    definitions.get(symbol.value) match {
+      case Some(paths) =>
+        paths.toList.map { location =>
+          SymbolDefinition(
+            querySymbol = querySymbol,
+            definitionSymbol = symbol,
+            path = location.path,
+            dialectOpt = dialectOpt,
+            range = location.range,
+            kind = None,
+            properties = 0
+          )
         }
-        .getOrElse(List.empty)
+      case None =>
+        // Fallback 3: guess related symbols from the enclosing class.
+        DefinitionAlternatives(symbol).flatMap(query0(querySymbol, _))
     }
   }
 
