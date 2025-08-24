@@ -47,15 +47,16 @@ object HoverMarkup {
       printedScalaStuff = true
     }
 
-    optSymbolSignature.foreach { symbolSignature =>
-      if (symbolSignature.nonEmpty) {
-        appendCode(
-          if (forceExpressionType) Some("Symbol signature") else None,
-          symbolSignature
-        )
+    val printedExpressionType = optSymbolSignature
+      .filter(_.nonEmpty)
+      .map((_, false))
+      .orElse(Some((expressionType, true)).filter(_._1.nonEmpty))
+      .map { case (symbolSignature, printedExpressionType0) =>
+        appendCode(None, symbolSignature)
         printedScalaStuff = true
+        printedExpressionType0
       }
-    }
+      .getOrElse(false)
     if (docstring.nonEmpty) {
       if (printedScalaStuff)
         builder.append("\n\n***\n")
@@ -64,7 +65,9 @@ object HoverMarkup {
         .append(docstring)
       printedDocstringStuff = true
     }
-    if (forceExpressionType || optSymbolSignature.isEmpty) {
+    if (
+      !printedExpressionType && (forceExpressionType || optSymbolSignature.isEmpty)
+    ) {
       if (printedDocstringStuff || printedScalaStuff)
         builder.append("\n\n***\n")
       appendCode(
