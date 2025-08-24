@@ -272,6 +272,7 @@ lazy val mtagsShared = project
       "com.google.protobuf" % "protobuf-java" % "4.31.1",
       V.guava,
       "io.get-coursier" % "interface" % V.coursierInterfaces,
+      "com.outr" %% "scribe" % V.scribe,
       "com.lihaoyi" %% "pprint" % V.pprint,
     ),
   )
@@ -335,6 +336,7 @@ val mtagsSettings = List(
     // for ivy completions
     "io.get-coursier" % "interface" % V.coursierInterfaces,
     "org.lz4" % "lz4-java" % "1.8.0",
+    "com.outr" %% "scribe" % V.scribe,
   ),
   libraryDependencies ++= {
     crossSetting(
