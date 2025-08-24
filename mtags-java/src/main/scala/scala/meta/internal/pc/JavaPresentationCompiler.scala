@@ -35,6 +35,7 @@ import org.eclipse.lsp4j.DocumentHighlight
 import org.eclipse.lsp4j.SelectionRange
 import org.eclipse.lsp4j.SignatureHelp
 import org.eclipse.lsp4j.TextEdit
+import scala.meta.pc.ContentType
 
 case class JavaPresentationCompiler(
     logger: java.util.function.Consumer[String],
@@ -44,7 +45,8 @@ case class JavaPresentationCompiler(
     search: SymbolSearch = EmptySymbolSearch,
     ec: ExecutionContextExecutor = ExecutionContext.global, // unused?
     sh: Option[ScheduledExecutorService] = None, // unused?
-    config: PresentationCompilerConfig = PresentationCompilerConfigImpl(),
+    config: PresentationCompilerConfig =
+      PresentationCompilerConfigImpl(hoverContentType = ContentType.MARKDOWN),
     workspace: Option[Path] = None // unused?
 ) extends PresentationCompiler {
 
