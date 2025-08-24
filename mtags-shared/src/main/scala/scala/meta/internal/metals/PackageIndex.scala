@@ -9,7 +9,6 @@ import java.util.logging.Level
 import java.util.logging.Logger
 
 import scala.reflect.NameTransformer
-import scala.util.Properties
 import scala.util.control.NonFatal
 
 import scala.meta.internal.jdk.CollectionConverters._
@@ -168,12 +167,17 @@ class PackageIndex() {
     }
   }
 
-  def visitBootClasspath(isExcludedPackage: String => Boolean): Unit = {
-    if (Properties.isJavaAtLeast("9")) {
-      expandJrtClasspath(isExcludedPackage)
-    } else {
-      PackageIndex.bootClasspath.foreach(visit)
+  def visitBootClasspath(
+      javaHome: Path,
+      isExcludedPackage: String => Boolean
+  ): Unit = {
+    val javaVer = JdkVersion0.fromJavaHome(javaHome).getOrElse {
+      sys.error(s"Cannot get Java version from $javaHome")
     }
+    if (javaVer.major >= 9)
+      expandJrtClasspath(isExcludedPackage)
+    else
+      PackageIndex.bootClasspath.foreach(visit)
   }
 
   private def expandJrtClasspath(isExcludedPackage: String => Boolean): Unit = {
@@ -222,10 +226,11 @@ class PackageIndex() {
 object PackageIndex {
   def fromClasspath(
       classpath: collection.Seq[Path],
-      isExcludedPackage: String => Boolean
+      isExcludedPackage: String => Boolean,
+      javaHome: Path
   ): PackageIndex = {
     val packages = new PackageIndex()
-    packages.visitBootClasspath(isExcludedPackage)
+    packages.visitBootClasspath(javaHome, isExcludedPackage)
     classpath.foreach { path => packages.visit(path) }
     packages
   }
