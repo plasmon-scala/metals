@@ -29,6 +29,7 @@ import java.nio.file.Path
 final class OnDemandSymbolIndex(
     dialectBuckets: TrieMap[Dialect, SymbolIndexBucket],
     onError: PartialFunction[Throwable, Unit],
+    sourceJars: () => OpenClassLoader,
     toIndexSource: AbsolutePath => AbsolutePath,
     javaHome: Path
 )(implicit rc: ReportContext)
@@ -46,6 +47,7 @@ final class OnDemandSymbolIndex(
       SymbolIndexBucket.empty(
         dialect,
         mtags,
+        sourceJars(),
         toIndexSource,
         onError,
         javaHome
@@ -167,11 +169,13 @@ object OnDemandSymbolIndex {
       onError: PartialFunction[Throwable, Unit] = { case e: Throwable =>
         throw e
       },
+      sourceJars: () => OpenClassLoader = () => new OpenClassLoader,
       toIndexSource: AbsolutePath => AbsolutePath = identity
   )(implicit rc: ReportContext): OnDemandSymbolIndex = {
     new OnDemandSymbolIndex(
       TrieMap.empty,
       onError,
+      sourceJars,
       toIndexSource,
       javaHome
     )
