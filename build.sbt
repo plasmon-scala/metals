@@ -42,8 +42,7 @@ ThisBuild / semanticdbVersion := V.semanticdb(scalaVersion.value)
 inThisBuild(
   List(
     version ~= { dynVer =>
-      if (isCI && !isTest) dynVer
-      else localSnapshotVersion // only for local publishing
+      localSnapshotVersion
     },
     scalaVersion := V.scala213,
     crossScalaVersions := List(V.scala213),
