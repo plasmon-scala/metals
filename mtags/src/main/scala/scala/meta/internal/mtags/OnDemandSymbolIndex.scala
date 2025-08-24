@@ -71,7 +71,7 @@ final class OnDemandSymbolIndex(
   }
 
   private var rootBucket = newRootBucket()
-  private val dependsOn =
+  private val dependees =
     new mutable.HashMap[GlobalSymbolIndex.Module, Set[GlobalSymbolIndex.Module]]
 
   def reset(module: GlobalSymbolIndex.Module): Unit =
@@ -82,14 +82,15 @@ final class OnDemandSymbolIndex(
   def clear(): Unit = {
     rootBucket = newRootBucket()
     dialectBuckets.clear()
-    dependsOn.clear()
+    dependees.clear()
   }
 
   def addDependsOn(
       module: GlobalSymbolIndex.Module,
       dependencies: Iterable[GlobalSymbolIndex.Module]
   ): Unit = {
-    dependsOn(module) = dependsOn.getOrElse(module, Set.empty) ++ dependencies
+    for (dep <- dependencies)
+      dependees(dep) = dependees.getOrElse(dep, Set.empty) + module
   }
 
   private def getOrCreateBucket(
@@ -219,10 +220,10 @@ final class OnDemandSymbolIndex(
       dialectOpt: Option[Dialect]
   ): Unit = {
     val mainBucket = getOrCreateBucket(dialectOpt, module)
-    val dependencies = dependsOn.getOrElse(module, Set.empty)
+    val dependees0 = dependees.getOrElse(module, Set.empty)
     def buckets = Iterator(mainBucket) ++ dialectBuckets.iterator
       .collect {
-        case ((_, mod), bucket) if dependencies.contains(mod) =>
+        case ((_, mod), bucket) if dependees0.contains(mod) =>
           bucket
       }
 
@@ -290,10 +291,10 @@ final class OnDemandSymbolIndex(
           .filter(_.sourceJars.hasEntry(path))
         it.toVector
       case Some(Right(module)) =>
-        val dependencies = dependsOn.getOrElse(module, Set.empty)
+        val dependees0 = dependees.getOrElse(module, Set.empty)
         val it = Iterator(mainBucket) ++ dialectBuckets.iterator
           .collect {
-            case ((_, mod), bucket) if dependencies.contains(mod) =>
+            case ((_, mod), bucket) if dependees0.contains(mod) =>
               bucket
           }
         it.toVector
