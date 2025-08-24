@@ -343,6 +343,7 @@ lazy val interfaces = project
       "-tag",
       "implNote:a:Implementation Note:",
     ),
+    Compile / doc / sources := Seq.empty,
   )
 
 lazy val turbine = project
@@ -423,6 +424,7 @@ lazy val mtagsShared = project
     },
     (Compile / PB.targets) :=
       Seq(PB.gens.java(V.protobuf) -> (Compile / sourceManaged).value),
+    Compile / doc / sources := Seq.empty,
   )
   .dependsOn(interfaces, jsemanticdb)
 
@@ -790,6 +792,7 @@ lazy val metals = project
       "latestScala3Next" -> V.latestScala3Next,
       "lastSupportedSemanticdb" -> SemanticDbSupport.last,
     ),
+    Compile / doc / sources := Seq.empty,
   )
   .dependsOn(mtags, `mtags-java`, `mtags-protobuf`)
   .enablePlugins(BuildInfoPlugin)
