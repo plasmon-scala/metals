@@ -32,6 +32,8 @@ abstract class CompilerAccess[Reporter, Compiler](
     userLogger: java.util.function.Consumer[String]
 )(implicit ec: ExecutionContextExecutor) {
 
+  var latestExceptionOpt = Option.empty[(Option[String], Throwable)]
+
   private val logger: Logger =
     Logger.getLogger(classOf[CompilerAccess[_, _]].getName)
 
@@ -114,7 +116,7 @@ abstract class CompilerAccess[Reporter, Compiler](
       uri,
       () => {
         queueThread = Some(Thread.currentThread())
-        try withSharedCompiler(default)(thunk)
+        try withSharedCompiler(default, uri)(thunk)
         finally isFinished.set(true)
       },
       token
@@ -158,7 +160,7 @@ abstract class CompilerAccess[Reporter, Compiler](
     onCompilerJobQueue(
       name,
       uri,
-      () => withSharedCompiler(default)(thunk),
+      () => withSharedCompiler(default, uri)(thunk),
       token
     )
   }
@@ -169,7 +171,8 @@ abstract class CompilerAccess[Reporter, Compiler](
    * May potentially run in parallel with other requests, use carefully.
    */
   def withSharedCompiler[T](
-      default: T
+      default: T,
+      uri: String
   )(
       thunk: CompilerWrapper[Reporter, Compiler] => T
   )(implicit queryInfo: PcQueryContext): T = {
@@ -187,6 +190,8 @@ abstract class CompilerAccess[Reporter, Compiler](
         }
         userLogger.accept("Caught exception")
         userLogger.accept(exStr)
+
+        latestExceptionOpt = Some((Some(uri).filter(_.nonEmpty), ex))
 
         if (java.lang.Boolean.getBoolean("plasmon.enable-interactive-retry"))
           handleSharedCompilerException(ex)
