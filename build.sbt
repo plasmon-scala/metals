@@ -47,11 +47,11 @@ inThisBuild(
     },
     scalaVersion := V.scala213,
     crossScalaVersions := List(V.scala213),
-    organization := "org.scalameta",
+    organization := "io.github.plasmon-scala",
     licenses := Seq(
       "Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0")
     ),
-    homepage := Some(url("https://github.com/scalameta/metals")),
+    homepage := Some(url("https://github.com/plasmon-scala/metals")),
     developers := metalsDevs,
     testFrameworks := List(),
     dependencyOverrides += V.guava,
@@ -501,6 +501,7 @@ lazy val metals = project
 
 lazy val `sbt-metals` = project
   .settings(
+    publish / skip := true,
     buildInfoPackage := "scala.meta.internal.sbtmetals",
     buildInfoKeys := Seq[BuildInfoKey](
       "semanticdbVersion" -> V.semanticdb(scalaVersion.value),
