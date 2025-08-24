@@ -11,6 +11,9 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.ThreadFactory
 
 import scala.jdk.CollectionConverters._
+import java.io.ByteArrayOutputStream
+import java.io.PrintStream
+import java.nio.charset.StandardCharsets
 
 /**
  * A thread pool executor to execute jobs on a single thread in a last-in-first-out order.
@@ -154,7 +157,9 @@ object CompilerJobQueue {
   }
 
   private val instanceNumber = new AtomicInteger(1)
-  def apply(): CompilerJobQueue = {
+  def apply(
+      userLogger: java.util.function.Consumer[String] = null
+  ): CompilerJobQueue = {
     new CompilerJobQueue(() => {
       val singleThreadExecutor = new ThreadPoolExecutor(
         /* corePoolSize */ 1,
@@ -175,6 +180,17 @@ object CompilerJobQueue {
                 catch {
                   case t: Throwable =>
                     scribe.error("Compiler thread error", t)
+                    if (userLogger != null) {
+                      val baos = new ByteArrayOutputStream
+                      t.printStackTrace(
+                        new PrintStream(baos, true, StandardCharsets.UTF_8)
+                      )
+                      val exStr =
+                        new String(baos.toByteArray, StandardCharsets.UTF_8)
+                      userLogger.accept(
+                        "Error:" + System.lineSeparator() + exStr
+                      )
+                    }
                 }
             }
             t.setDaemon(true)
