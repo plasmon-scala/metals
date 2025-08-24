@@ -10,6 +10,7 @@ import scala.meta.internal.semanticdb.TextDocument
 import scala.meta.io.AbsolutePath
 import scala.meta.pc.reports.EmptyReportContext
 import scala.meta.pc.reports.ReportContext
+import java.util.function.Consumer
 
 final class Mtags(implicit rc: ReportContext) {
   def totalLinesOfCode: Long = javaLines + scalaLines
@@ -24,13 +25,15 @@ final class Mtags(implicit rc: ReportContext) {
 
   def toplevels(
       path: AbsolutePath,
-      dialect: Dialect = dialects.Scala213
+      dialect: Dialect = dialects.Scala213,
+      logger: Consumer[String] = null
   ): TextDocument =
-    toplevels(path.toInput, dialect)
+    toplevels(path.toInput, dialect, logger = logger)
 
   def toplevels(
       input: Input.VirtualFile,
-      dialect: Dialect
+      dialect: Dialect,
+      logger: Consumer[String]
   ): TextDocument = {
     val language = input.toLanguage
 
@@ -43,7 +46,8 @@ final class Mtags(implicit rc: ReportContext) {
             input,
             includeInnerClasses = false,
             includeMembers = false,
-            dialect
+            dialect,
+            logger = logger
           )
       addLines(language, input.text)
       Mtags.stdLibPatches.patchDocument(
@@ -58,7 +62,8 @@ final class Mtags(implicit rc: ReportContext) {
   def indexWithOverrides(
       input: Input.VirtualFile,
       dialectOpt: Option[Dialect] = None,
-      includeMembers: Boolean = false
+      includeMembers: Boolean = false,
+      logger: Consumer[String] = null
   ): (TextDocument, MtagsIndexer.AllOverrides) = {
     val language = input.toLanguage
     if (language.isJava) {
@@ -76,7 +81,8 @@ final class Mtags(implicit rc: ReportContext) {
             input,
             includeInnerClasses = true,
             includeMembers,
-            dialect
+            dialect,
+            logger = logger
           )
           addLines(language, input.text)
           val doc =
@@ -102,8 +108,15 @@ final class Mtags(implicit rc: ReportContext) {
   def topLevelSymbols(
       input: Input.VirtualFile,
       dialect: Dialect
+  ): List[String] =
+    topLevelSymbols(input, dialect, logger = null)
+
+  def topLevelSymbols(
+      input: Input.VirtualFile,
+      dialect: Dialect,
+      logger: Consumer[String]
   ): List[String] = {
-    toplevels(input, dialect).occurrences.iterator
+    toplevels(input, dialect, logger).occurrences.iterator
       .filterNot(_.symbol.isPackage)
       .map(_.symbol)
       .toList
@@ -180,14 +193,21 @@ object Mtags {
   def allToplevels(
       input: Input.VirtualFile,
       dialect: Dialect,
-      includeMembers: Boolean = true
+      includeMembers: Boolean = true,
+      logger: Consumer[String] = null
   )(implicit rc: ReportContext = new EmptyReportContext()): TextDocument =
     input.toLanguage match {
       case Language.JAVA =>
         new JavaMtags(input, includeMembers = true).index()
       case Language.SCALA =>
         val mtags =
-          new ScalaToplevelMtags(input, true, includeMembers, dialect)
+          new ScalaToplevelMtags(
+            input,
+            true,
+            includeMembers,
+            dialect,
+            logger = logger
+          )
         mtags.index()
       case _ =>
         TextDocument()
