@@ -1,46 +1,63 @@
 package scala.meta.internal.mtags
 
-import java.net.URLClassLoader
 import java.nio.file.Path
-import java.nio.file.Paths
 
 import scala.collection.mutable
-import scala.util.Try
 
-import scala.meta.internal.jdk.CollectionConverters._
 import scala.meta.internal.mtags.CommonMtagsEnrichments.XtensionNIOPath
+import java.net.URI
+import java.util
+import java.nio.file.FileSystemAlreadyExistsException
+import java.nio.file.FileSystem
+import java.nio.file.FileSystems
+import java.nio.file.Files
 
-final class OpenClassLoader extends URLClassLoader(Array.empty) {
+final class OpenClassLoader extends AutoCloseable {
+
+  // from https://github.com/scalameta/scalameta/blob/491b8b28b6e7c3a75994bba4caf5c4b4fee526a2/scalameta/io/jvm/src/main/scala/scala/meta/internal/io/PlatformFileIO.scala#L103-L105
+  private def newFileSystem(path: Path): FileSystem = {
+    val uri = URI.create("jar:" + path.toUri.toString)
+    try FileSystems.newFileSystem(uri, new util.HashMap[String, Object])
+    catch {
+      case _: FileSystemAlreadyExistsException => FileSystems.getFileSystem(uri)
+    }
+  }
+
+  override def close(): Unit =
+    for ((_, path) <- map)
+      path.getFileSystem.close()
+
   private val isAdded = mutable.Set.empty[Path]
+  private val map = mutable.ListMap.empty[Path, Path]
 
-  override def toString: String = super.getURLs.toList.toString()
+  override def toString: String =
+    map.iterator.map(_._1).mkString("OpenClassLoader(", ", ", ")")
 
   def addClasspath(classpath: List[Path]): Boolean =
     classpath.forall(addEntry)
 
   def addEntry(entry: Path): Boolean = {
-    if (!isAdded(entry)) {
-      super.addURL(entry.toUri.toURL)
+    val isAdded0 = isAdded(entry)
+    if (!isAdded0) {
+      val fs = newFileSystem(entry)
+      map += entry -> fs.getPath("/")
       isAdded += entry
-      true
-    } else {
-      false
     }
+    !isAdded0
   }
 
-  def resolve(uri: String): Option[Path] = {
-    val enumeration = super.findResources(uri)
-    if (enumeration.hasMoreElements) {
-      val url = enumeration.nextElement()
-      Some(Paths.get(url.toURI))
-    } else {
-      None
-    }
-  }
-  def resolveAll(uri: String): List[Path] = {
-    val enumeration = super.findResources(uri)
-    enumeration.asScala.toList.map(url => Paths.get(url.toURI))
-  }
+  private def resolve0(uri: String): Iterator[Path] =
+    map.iterator
+      .flatMap { case (_, root) =>
+        val f = root.resolve(uri)
+        val exists = Files.exists(f)
+        if (exists) Iterator(f)
+        else Iterator.empty
+      }
+  private def resolve(uri: String): Option[Path] =
+    resolve0(uri).take(1).toList.headOption
+  def resolveAll(uri: String): List[Path] =
+    resolve0(uri).toList
 
   def resolve(relpath: Path): Option[Path] = {
     val uri = relpath.toURI(isDirectory = false).toString
@@ -48,6 +65,6 @@ final class OpenClassLoader extends URLClassLoader(Array.empty) {
   }
 
   def loadClassSafe(symbol: String): Option[Class[_]] =
-    Try(loadClass(symbol)).toOption
+    None
 
 }
