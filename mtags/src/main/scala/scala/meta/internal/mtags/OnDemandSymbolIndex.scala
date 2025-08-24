@@ -4,6 +4,7 @@ import java.util.zip.ZipError
 import java.util.zip.ZipException
 
 import scala.collection.concurrent.TrieMap
+import scala.collection.mutable
 import scala.util.control.NonFatal
 
 import scala.meta.Dialect
@@ -52,7 +53,7 @@ final class OnDemandSymbolIndex(
   private val onErrorOption = onError.andThen(_ => None)
 
   private def newRootBucket(): SymbolIndexBucket = {
-    lazy val bucket: SymbolIndexBucket = SymbolIndexBucket.empty(
+    SymbolIndexBucket.empty(
       scala.meta.dialects.Scala213Source3, // unused anyway
       mtags,
       sourceJars(),
@@ -60,13 +61,14 @@ final class OnDemandSymbolIndex(
       onError,
       javaHome,
       javaOnly = true,
-      addTextDocuments =
-        (origin, path, docs) => addTextDocuments(bucket, origin, path, docs)
+      addTextDocuments = (bucket, origin, path, docs) =>
+        addTextDocuments(bucket, origin, path, docs)
     )
-    bucket
   }
 
   private var rootBucket = newRootBucket()
+  private val dependsOn =
+    new mutable.HashMap[GlobalSymbolIndex.Module, Set[GlobalSymbolIndex.Module]]
 
   def reset(module: GlobalSymbolIndex.Module): Unit =
     for (((dialect, module0), _) <- dialectBuckets.toList if module0 == module)
@@ -74,6 +76,14 @@ final class OnDemandSymbolIndex(
   def clear(): Unit = {
     rootBucket = newRootBucket()
     dialectBuckets.clear()
+    dependsOn.clear()
+  }
+
+  def addDependsOn(
+      module: GlobalSymbolIndex.Module,
+      dependencies: Iterable[GlobalSymbolIndex.Module]
+  ): Unit = {
+    dependsOn(module) = dependsOn.getOrElse(module, Set.empty) ++ dependencies
   }
 
   private def getOrCreateBucket(
@@ -120,7 +130,7 @@ final class OnDemandSymbolIndex(
     tryRun(
       dir.toString,
       List.empty,
-      getOrCreateBucket(dialect, module).addSourceDirectory(module, dir)
+      getOrCreateBucket(dialect, module).addSourceDirectory(dir)
     )
 
   // Traverses all source files in the given jar file and records
@@ -253,10 +263,17 @@ final class OnDemandSymbolIndex(
     }
     val buckets: Seq[SymbolIndexBucket] = originOpt0 match {
       case Some(Left(path)) =>
-        dialectBuckets.valuesIterator
+        val it = Iterator(mainBucket) ++ dialectBuckets.valuesIterator
           .filter(_.sourceJars.hasEntry(path))
-          .toVector
-      case Some(Right(module)) => ???
+        it.toVector
+      case Some(Right(module)) =>
+        val dependencies = dependsOn.getOrElse(module, Set.empty)
+        val it = Iterator(mainBucket) ++ dialectBuckets.iterator
+          .collect {
+            case ((_, mod), bucket) if dependencies.contains(mod) =>
+              bucket
+          }
+        it.toVector
       case None =>
         scribe.warn("???")
         Seq(mainBucket)

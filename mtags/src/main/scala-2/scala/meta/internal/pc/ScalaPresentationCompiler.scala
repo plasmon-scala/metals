@@ -673,7 +673,8 @@ class ScalaPresentationCompiler(
     val classpath = this.classpath.mkString(File.pathSeparator)
     val vd = new VirtualDirectory("(memory)", None)
     val settings = new Settings
-    // settings.debug.value = true
+    settings.debug.value =
+      Option(System.getenv("PLASMON_DEBUG")).contains("true")
     settings.Ymacroexpand.value = "discard"
     settings.outputDirs.setSingleOutput(vd)
     settings.classpath.value = classpath
