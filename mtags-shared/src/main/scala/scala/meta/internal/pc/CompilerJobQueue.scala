@@ -1,5 +1,8 @@
 package scala.meta.internal.pc
 
+import java.io.ByteArrayOutputStream
+import java.io.PrintStream
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.CancellationException
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.PriorityBlockingQueue
@@ -154,7 +157,10 @@ object CompilerJobQueue {
   }
 
   private val instanceNumber = new AtomicInteger(1)
-  def apply(id: String = ""): CompilerJobQueue = {
+  def apply(
+      id: String = "",
+      userLogger: java.util.function.Consumer[String] = null
+  ): CompilerJobQueue = {
     new CompilerJobQueue(() => {
       val singleThreadExecutor = new ThreadPoolExecutor(
         /* corePoolSize */ 1,
@@ -176,6 +182,17 @@ object CompilerJobQueue {
                 catch {
                   case t: Throwable =>
                     scribe.error("Compiler thread error", t)
+                    if (userLogger != null) {
+                      val baos = new ByteArrayOutputStream
+                      t.printStackTrace(
+                        new PrintStream(baos, true, StandardCharsets.UTF_8)
+                      )
+                      val exStr =
+                        new String(baos.toByteArray, StandardCharsets.UTF_8)
+                      userLogger.accept(
+                        "Error:" + System.lineSeparator() + exStr
+                      )
+                    }
                 }
             }
             t.setDaemon(true)

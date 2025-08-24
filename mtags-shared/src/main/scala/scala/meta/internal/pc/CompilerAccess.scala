@@ -38,7 +38,7 @@ abstract class CompilerAccess[+Reporter, Compiler](
 
   var latestExceptionOpt: Option[(Option[String], Throwable)] = None
 
-  val jobs: CompilerJobQueue = CompilerJobQueue(id)
+  val jobs: CompilerJobQueue = CompilerJobQueue(id, userLogger)
   private var __compiler: CompilerWrapper[_, Compiler] = _
   private def _compiler: CompilerWrapper[Reporter, Compiler] =
     __compiler.asInstanceOf[CompilerWrapper[Reporter, Compiler]]
