@@ -28,7 +28,7 @@ class HoverLspSuite extends BaseLspSuite("hover-") with TestHovers {
            |Selects the first element of this iterable collection.
            | Note: might return different results for different runs, unless the underlying collection type is ordered.
            |
-           |**Returns:** the first element of this iterable collection.
+           |**Returns** the first element of this iterable collection.
            |
            |**Throws**
            |- `NoSuchElementException`: if the iterable collection is empty.
@@ -92,7 +92,7 @@ class HoverLspSuite extends BaseLspSuite("hover-") with TestHovers {
            |Selects the first element of this iterable collection.
            | Note: might return different results for different runs, unless the underlying collection type is ordered.
            |
-           |**Returns:** the first element of this iterable collection.
+           |**Returns** the first element of this iterable collection.
            |
            |**Throws**
            |- `NoSuchElementException`: if the iterable collection is empty.
@@ -286,7 +286,7 @@ class HoverLspSuite extends BaseLspSuite("hover-") with TestHovers {
            |Selects the first element of this iterable collection.
            | Note: might return different results for different runs, unless the underlying collection type is ordered.
            |
-           |**Returns:** the first element of this iterable collection.
+           |**Returns** the first element of this iterable collection.
            |
            |**Throws**
            |- `NoSuchElementException`: if the iterable collection is empty.
