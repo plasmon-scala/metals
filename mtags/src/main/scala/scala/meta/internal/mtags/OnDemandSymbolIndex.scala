@@ -105,6 +105,19 @@ final class OnDemandSymbolIndex(
       }
     )
 
+  // Traverses all source files in the given jar file and returns
+  // all non-trivial toplevel Scala symbols.
+  def indexSource(
+      path: AbsolutePath,
+      sourceDirectory: Option[AbsolutePath],
+      dialect: Dialect
+  ): IndexingResult =
+    getOrCreateBucket(dialect).indexSource(
+      path,
+      sourceDirectory,
+      isJava = false
+    )
+
   // Used to add cached toplevel symbols to index
   def addIndexedSourceJar(
       jar: AbsolutePath,

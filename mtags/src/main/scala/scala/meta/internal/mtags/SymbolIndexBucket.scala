@@ -88,6 +88,16 @@ class SymbolIndexBucket(
       List.empty
   }
 
+  def indexSourceJar(jar: AbsolutePath, isJava: Boolean): List[IndexingResult] =
+    FileIO.withJarFileSystem(jar, create = false) { root =>
+      root.listRecursive.toList.flatMap {
+        case source if source.isScala =>
+          Seq(indexSource(source, None, isJava = isJava))
+        case _ =>
+          Nil
+      }
+    }
+
   def addIndexedSourceJar(
       jar: AbsolutePath,
       symbols: List[(String, AbsolutePath)]
@@ -109,7 +119,7 @@ class SymbolIndexBucket(
       isJava: Boolean
   ): Option[IndexingResult] = try {
     val IndexingResult(path, topLevels, overrides) =
-      indexSource(source, dialect, sourceDirectory, isJava)
+      indexSource(source, sourceDirectory, isJava)
     topLevels.foreach { symbol =>
       toplevels.updateWith(symbol) {
         case Some(acc) => Some(acc + source)
@@ -123,9 +133,8 @@ class SymbolIndexBucket(
       None
   }
 
-  private def indexSource(
+  def indexSource(
       source: AbsolutePath,
-      dialect: Dialect,
       sourceDirectory: Option[AbsolutePath],
       isJava: Boolean
   ): IndexingResult = {
