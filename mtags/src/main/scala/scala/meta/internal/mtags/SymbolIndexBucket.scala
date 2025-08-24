@@ -50,7 +50,7 @@ class SymbolIndexBucket(
 
   private val logger = Logger.getLogger(classOf[SymbolIndexBucket].getName)
 
-  def close(): Unit = sourceJars.close()
+  def close(): Unit = () // sourceJars.close()
 
   def addSourceDirectory(
       dir: AbsolutePath
