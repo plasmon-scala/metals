@@ -325,15 +325,22 @@ class HoverProvider(
         val macroSuffix =
           if (symbol.isMacro) " = macro"
           else ""
+        val isClassLike =
+          symbol.isJavaInterface || symbol.isTrait || symbol.isClass ||
+            (symbol.isType && !symbol.isParameter) || symbol.hasPackageFlag || symbol.isModule
         val prettySignature =
-          printer.defaultMethodSignature(flags) + macroSuffix
+          printer.defaultMethodSignature(
+            flags,
+            isClassLike = isClassLike
+          ) + macroSuffix
         Some(
           ScalaHover(
             expressionType = Some(prettyType),
             symbolSignature = Some(prettySignature),
             docstring = Some(docstring),
-            forceExpressionType = pos.start != pos.end || (!prettySignature
-              .endsWith(prettyType) && !symbol.isType),
+            forceExpressionType =
+              !isClassLike && (pos.start != pos.end || (!prettySignature
+                .endsWith(prettyType) && !symbol.isType)),
             range = if (range.isRange) Some(range.toLsp) else None,
             contextInfo = history.getUsedRenamesInfo(),
             contentType = contentType
