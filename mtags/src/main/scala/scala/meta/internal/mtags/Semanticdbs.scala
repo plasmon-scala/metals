@@ -91,6 +91,7 @@ object Semanticdbs {
           if (optScalaVersion.exists(_.startsWith("3")))
             addIfStaleInfo(
               scalaPath,
+              semanticdbPath,
               sdoc,
               Shebang.adjustContent(text),
               fingerprints,
@@ -98,13 +99,21 @@ object Semanticdbs {
             )
           else TextDocumentLookup.NotFound(scalaPath)
         } else
-          addIfStaleInfo(scalaPath, sdoc, text, fingerprints, log)
+          addIfStaleInfo(
+            scalaPath,
+            semanticdbPath,
+            sdoc,
+            text,
+            fingerprints,
+            log
+          )
       case _ => TextDocumentLookup.NotFound(scalaPath)
     }
   }
 
   private def addIfStaleInfo(
       scalaPath: AbsolutePath,
+      semanticdbPath: AbsolutePath,
       sdoc: s.TextDocument,
       currentText: String,
       fingerprints: Md5Fingerprints,
@@ -121,7 +130,7 @@ object Semanticdbs {
           TextDocumentLookup.Stale(scalaPath, md5, sdoc)
       }
     } else {
-      TextDocumentLookup.Success(sdoc.withText(currentText))
+      TextDocumentLookup.Success(sdoc.withText(currentText), semanticdbPath)
     }
   }
 

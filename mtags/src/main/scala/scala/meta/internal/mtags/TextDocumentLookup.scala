@@ -1,7 +1,7 @@
 package scala.meta.internal.mtags
 
-import scala.meta.AbsolutePath
 import scala.meta.internal.{semanticdb => s}
+import scala.meta.io.AbsolutePath
 
 sealed abstract class TextDocumentLookup {
   case class MissingSemanticdb(file: AbsolutePath)
@@ -14,7 +14,7 @@ sealed abstract class TextDocumentLookup {
     this.isInstanceOf[TextDocumentLookup.Success]
   final def documentIncludingStale: Option[s.TextDocument] =
     this match {
-      case TextDocumentLookup.Success(doc) => Some(doc)
+      case TextDocumentLookup.Success(doc, _) => Some(doc)
       case TextDocumentLookup.Stale(_, _, doc) => Some(doc)
       case TextDocumentLookup.Aggregate(results) =>
         results.flatMap(_.documentIncludingStale).headOption
@@ -22,7 +22,7 @@ sealed abstract class TextDocumentLookup {
     }
   final def toOption: Option[s.TextDocument] =
     this match {
-      case TextDocumentLookup.Success(document) =>
+      case TextDocumentLookup.Success(document, _) =>
         Some(document)
       case _ => None
     }
@@ -33,7 +33,7 @@ sealed abstract class TextDocumentLookup {
     }
   final def getE: Either[Throwable, s.TextDocument] =
     this match {
-      case TextDocumentLookup.Success(document) =>
+      case TextDocumentLookup.Success(document, _) =>
         Right(document)
       case TextDocumentLookup.NotFound(file) =>
         Left(MissingSemanticdb(file))
@@ -57,10 +57,11 @@ object TextDocumentLookup {
       doc: Option[s.TextDocument]
   ): TextDocumentLookup =
     doc match {
-      case Some(value) => Success(value)
+      case Some(value) => Success(value, path)
       case None => NotFound(path)
     }
-  case class Success(document: s.TextDocument) extends TextDocumentLookup
+  case class Success(document: s.TextDocument, path: AbsolutePath)
+      extends TextDocumentLookup
   case class Aggregate(errors: List[TextDocumentLookup])
       extends TextDocumentLookup
   case class Error(e: Throwable, path: AbsolutePath) extends TextDocumentLookup
