@@ -24,7 +24,7 @@ class CompileProvider(val compiler: MetalsGlobal, params: VirtualFileParams) {
         new StringBuilder()
           .append(info.pos.source.file.path)
           .append(":")
-          .append(info.pos.column)
+          .append(info.pos.line)
           .append(" ")
           .append(info.msg)
           .append("\n")
