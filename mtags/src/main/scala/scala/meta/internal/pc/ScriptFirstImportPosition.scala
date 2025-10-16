@@ -34,10 +34,11 @@ object ScriptFirstImportPosition {
     scriptStartOffset(text, "/*<script>*/")
 
   private def scriptStartOffset(text: String, marker: String) = {
-    val iterator = tokenize(adjustShebang(text)).iterator
+    val text0 = adjustShebang(text)
+    val iterator = tokenize(text0).iterator
     startMarkerOffset(iterator, t => t.is[Token.Comment] && t.text == marker)
       .map { startOffset =>
-        skipComments(iterator, startOffset)
+        skipComments(iterator, startOffset, text0)
       }
   }
 
@@ -45,12 +46,13 @@ object ScriptFirstImportPosition {
       text: String,
       isScala3Worksheet: Boolean = false
   ): Int = {
-    val iterator = tokenize(adjustShebang(text)).iterator
+    val text0 = adjustShebang(text)
+    val iterator = tokenize(text0).iterator
     val startOffset =
       if (isScala3Worksheet)
         startMarkerOffset(iterator, _.is[Token.LeftBrace]).getOrElse(-1)
       else -1
-    skipComments(iterator, startOffset)
+    skipComments(iterator, startOffset, text0)
   }
 
   @tailrec
@@ -74,8 +76,14 @@ object ScriptFirstImportPosition {
     }
   }
 
-  private def skipComments(it: Iterator[Token], startOffset: Int): Int =
-    skipComments(it, startOffset, startOffset, 0, false) + 1
+  private def skipComments(it: Iterator[Token], startOffset: Int, text: String): Int = {
+    val offset = skipComments(it, startOffset, startOffset, 0, false)
+    val skipLineSep =
+      if (text.length >= offset + 2 && text(offset) == '\r' && text(offset + 1) == '\n') 2
+      else if (text.length >= offset + 1 && text(offset) == '\n') 1
+      else 0
+    offset + skipLineSep
+  }
 
   @tailrec
   private def skipComments(
