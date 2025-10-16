@@ -9,7 +9,7 @@ Global / onChangedBuildSource := ReloadOnSourceChanges
 Global / resolvers += "scala-integration" at
   "https://scala-ci.typesafe.com/artifactory/scala-integration/"
 
-def localSnapshotVersion = "1.6.1-SNAPSHOT" // for plasmon
+def localSnapshotVersion = "1.6.2-SNAPSHOT" // for plasmon
 def isCI = System.getenv("CI") != null
 def isTest = System.getenv("METALS_TEST") != null
 
