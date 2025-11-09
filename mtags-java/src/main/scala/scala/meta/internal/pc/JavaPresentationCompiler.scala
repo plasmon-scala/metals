@@ -37,17 +37,26 @@ import org.eclipse.lsp4j.SignatureHelp
 import org.eclipse.lsp4j.TextEdit
 
 case class JavaPresentationCompiler(
+    logger: java.util.function.Consumer[String],
     buildTargetIdentifier: String = "",
     classpath: Seq[Path] = Nil,
-    options: List[String] = Nil,
+    options: List[String] = Nil, // unused?
     search: SymbolSearch = EmptySymbolSearch,
-    ec: ExecutionContextExecutor = ExecutionContext.global,
-    sh: Option[ScheduledExecutorService] = None,
+    ec: ExecutionContextExecutor = ExecutionContext.global, // unused?
+    sh: Option[ScheduledExecutorService] = None, // unused?
     config: PresentationCompilerConfig = PresentationCompilerConfigImpl(),
-    workspace: Option[Path] = None
+    workspace: Option[Path] = None // unused?
 ) extends PresentationCompiler {
 
-  private val javaCompiler = new JavaMetalsGlobal(search, config, classpath)
+  private lazy val javaCompiler = {
+    logger.accept(
+      s"Creating new Java presentation compiler for $buildTargetIdentifier"
+    )
+    logger.accept("Class path:")
+    for (p <- classpath)
+      logger.accept(s"  $p")
+    new JavaMetalsGlobal(search, config, classpath)
+  }
 
   override def complete(
       params: OffsetParams
@@ -75,7 +84,12 @@ case class JavaPresentationCompiler(
   ): CompletableFuture[Optional[HoverSignature]] =
     CompletableFuture.completedFuture(
       Optional.ofNullable(
-        new JavaHoverProvider(javaCompiler, params, config.hoverContentType())
+        new JavaHoverProvider(
+          javaCompiler,
+          params,
+          config.hoverContentType(),
+          logger
+        )
           .hover()
           .orNull
       )

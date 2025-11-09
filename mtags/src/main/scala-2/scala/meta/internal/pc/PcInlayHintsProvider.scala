@@ -25,7 +25,7 @@ final class PcInlayHintsProvider(
   lazy val textStr = text.mkString
   val uri: URI = params.uri()
 
-  typeCheck(unit)
+  metalsTypeCheck(unit)
   val pos: Position =
     unit.position(params.offset()).withEnd(params.endOffset())
 
