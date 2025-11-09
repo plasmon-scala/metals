@@ -21,6 +21,7 @@ import scala.tools.nsc.Settings
 import scala.tools.nsc.interactive.Global
 import scala.tools.nsc.interactive.GlobalProxy
 import scala.tools.nsc.interactive.InteractiveAnalyzer
+import scala.tools.nsc.io.AbstractFile
 import scala.tools.nsc.reporters.Reporter
 import scala.util.control.NonFatal
 import scala.{meta => m}
@@ -37,8 +38,13 @@ import scala.meta.pc.SymbolDocumentation
 import scala.meta.pc.SymbolSearch
 
 import org.eclipse.{lsp4j => l}
+import java.util.concurrent.ConcurrentHashMap
+import java.io.PrintStream
+import java.io.ByteArrayOutputStream
+import java.nio.charset.StandardCharsets
 
 class MetalsGlobal(
+    val userLogger: java.util.function.Consumer[String],
     settings: Settings,
     reporter: Reporter,
     val search: SymbolSearch,
@@ -75,6 +81,55 @@ class MetalsGlobal(
   override def close(): Unit = {
     super.close()
     logger.log(Level.FINE, "Restarting compiler and clearing caches.")
+  }
+
+  private val typeCheckingCache =
+    new ConcurrentHashMap[AbstractFile, Array[Char]]
+  def metalsTypeCheck(unit: RichCompilationUnit): Unit = {
+    val (messageOpt, needsTypeCheck) = Option(
+      typeCheckingCache.get(unit.source.file)
+    ) match {
+      case Some(formerContent) =>
+        if (util.Arrays.equals(formerContent, unit.source.content))
+          (None, false)
+        else
+          (Some(s"${unit.source.file} needs new type checking"), true)
+      case None =>
+        (Some(s"Type checking ${unit.source.file}…"), true)
+    }
+    for (message <- messageOpt)
+      userLogger.accept(message)
+    if (needsTypeCheck) {
+      try typeCheck(unit)
+      catch {
+        case t: Throwable =>
+          userLogger.accept("Exception thrown during type checking")
+          val baos = new ByteArrayOutputStream
+          t.printStackTrace(new PrintStream(baos, true, StandardCharsets.UTF_8))
+          userLogger.accept(
+            new String(baos.toByteArray, StandardCharsets.UTF_8)
+          )
+          throw t
+      }
+      typeCheckingCache.put(unit.source.file, unit.source.content)
+      userLogger.accept("Done type checking")
+    }
+  }
+
+  override def parseTree(source: SourceFile): Tree = {
+    userLogger.accept(s"Parsing ${source.file}…")
+    val res =
+      try super.parseTree(source)
+      catch {
+        case t: Throwable =>
+          userLogger.accept("Exception thrown during parsing")
+          val baos = new ByteArrayOutputStream
+          t.printStackTrace(new PrintStream(baos, true))
+          userLogger.accept(new String(baos.toByteArray))
+          throw t
+      }
+    userLogger.accept("Done parsing")
+    res
   }
 
   val logger: Logger = Logger.getLogger(classOf[MetalsGlobal].getName)
@@ -299,7 +354,8 @@ class MetalsGlobal(
           parentSymbols.map(toSemanticdbSymbol).asJava
         }
       },
-      contentType
+      contentType,
+      userLogger
     )
 
     if (documentation.isPresent) {
