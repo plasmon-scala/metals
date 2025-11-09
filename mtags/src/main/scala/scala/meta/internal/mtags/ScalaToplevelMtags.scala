@@ -2,6 +2,7 @@ package scala.meta.internal.mtags
 
 import java.nio.file.Paths
 import java.util.Optional
+import java.util.function.Consumer
 
 import scala.annotation.tailrec
 
@@ -51,7 +52,8 @@ class ScalaToplevelMtags(
     includeInnerClasses: Boolean,
     includeMembers: Boolean,
     dialect: Dialect,
-    collectIdentifiers: Boolean = false
+    collectIdentifiers: Boolean = false,
+    logger: Consumer[String] = null
 )(implicit rc: ReportContext)
     extends MtagsIndexer {
 
@@ -358,9 +360,12 @@ class ScalaToplevelMtags(
             }
           } else scanner.mtagsNextToken()
           loop(indent.notAfterNewline, currRegion, newExpectIgnoreBody)
-        case IMPORT | EXPORT =>
+        case IMPORT =>
           // skip imports because they might have `given` kw
           acceptToStatSep()
+          loop(indent.notAfterNewline, currRegion, expectTemplate)
+        case EXPORT =>
+          emitExport(currRegion.owner)
           loop(indent.notAfterNewline, currRegion, expectTemplate)
         case COMMENT =>
           // skip comment because they might break indentation
@@ -665,6 +670,16 @@ class ScalaToplevelMtags(
         require(isOk = false, "package name or package object")
         false
     }
+  }
+
+  def emitExport(owner: String): Unit = {
+    require(curr.token == EXPORT, "export")
+    if (currentOwner eq Symbols.EmptyPackage)
+      currentOwner = Symbols.RootPackage
+    currentOwner = owner
+    acceptToStatSepStr()
+    val name = input.path.split("/").last.stripSuffix(".scala")
+    term(s"$name$$package", newPosition, Kind.PACKAGE_OBJECT, 0)
   }
 
   /**
@@ -999,6 +1014,26 @@ class ScalaToplevelMtags(
     }
   }
 
+  def acceptBalancedDelimetersStr(
+      Open: Int,
+      Close: Int,
+      buf: StringBuilder
+  ): Unit = {
+    require(curr.token == Open, "open delimeter { or (")
+    var count = 1
+    while (!isDone && count > 0) {
+      buf ++= tokenStr()
+      scanner.mtagsNextToken()
+      curr.token match {
+        case Open =>
+          count += 1
+        case Close =>
+          count -= 1
+        case _ =>
+      }
+    }
+  }
+
   /**
    * Consumes the token stream until outdent to the same indentation level
    */
@@ -1055,6 +1090,36 @@ class ScalaToplevelMtags(
     ) {
       scanner.mtagsNextToken()
     }
+  }
+
+  private def tokenStr(): String =
+    curr.token match {
+      case DOT => "."
+      case IDENTIFIER => curr.strVal
+      case GIVEN => "given"
+      case _ =>
+        curr.strVal // ???
+    }
+
+  def acceptToStatSepStr(): String = {
+    val b = new StringBuilder
+    scanner.mtagsNextToken()
+    while (
+      !isDone &&
+      (curr.token match {
+        case SEMI =>
+          false
+        case LBRACE =>
+          acceptBalancedDelimetersStr(LBRACE, RBRACE, b)
+          true
+        case _ =>
+          !isNewline
+      })
+    ) {
+      b ++= tokenStr()
+      scanner.mtagsNextToken()
+    }
+    b.result()
   }
 
   private def acceptTrivia(): Option[Int] = {
