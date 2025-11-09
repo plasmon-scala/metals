@@ -16,16 +16,19 @@ final class Mtags(implicit rc: ReportContext) {
   def totalLinesOfScala: Long = scalaLines
   def totalLinesOfJava: Long = javaLines
 
-  def allSymbols(path: AbsolutePath, dialect: Dialect): TextDocument = {
-    val language = path.toLanguage
-    index(language, path, dialect)
-  }
+  def allSymbols(input: Input.VirtualFile, dialect: Dialect): TextDocument =
+    index(input.toLanguage, input, dialect)
 
   def toplevels(
       path: AbsolutePath,
       dialect: Dialect = dialects.Scala213
+  ): TextDocument =
+    toplevels(path.toInput, dialect)
+
+  def toplevels(
+      input: Input.VirtualFile,
+      dialect: Dialect
   ): TextDocument = {
-    val input = path.toInput
     val language = input.toLanguage
 
     if (language.isJava || language.isScala) {
@@ -41,7 +44,7 @@ final class Mtags(implicit rc: ReportContext) {
           )
       addLines(language, input.text)
       Mtags.stdLibPatches.patchDocument(
-        path,
+        input.path,
         mtags.index()
       )
     } else {
@@ -50,7 +53,7 @@ final class Mtags(implicit rc: ReportContext) {
   }
 
   def extendedIndexing(
-      path: AbsolutePath,
+      input: Input.VirtualFile,
       dialect: Dialect = dialects.Scala213,
       includeMembers: Boolean = false
   ): (
@@ -58,7 +61,6 @@ final class Mtags(implicit rc: ReportContext) {
       MtagsIndexer.AllOverrides,
       MtagsIndexer.AllToplevelMembers
   ) = {
-    val input = path.toInput
     val language = input.toLanguage
     if (language.isJava || language.isScala) {
       val mtags =
@@ -74,7 +76,7 @@ final class Mtags(implicit rc: ReportContext) {
       addLines(language, input.text)
       val doc =
         Mtags.stdLibPatches.patchDocument(
-          path,
+          input.path,
           mtags.index()
         )
       val overrides = mtags.overrides()
@@ -84,21 +86,32 @@ final class Mtags(implicit rc: ReportContext) {
   }
 
   def topLevelSymbols(
-      path: AbsolutePath,
-      dialect: Dialect = dialects.Scala213
+      input: Input.VirtualFile
   ): List[String] = {
-    toplevels(path, dialect).occurrences.iterator
+    topLevelSymbols(input, dialects.Scala213)
+  }
+
+  def topLevelSymbols(
+      input: Input.VirtualFile,
+      dialect: Dialect
+  ): List[String] = {
+    toplevels(input, dialect).occurrences.iterator
       .filterNot(_.symbol.isPackage)
       .map(_.symbol)
       .toList
   }
 
+  def topLevelSymbols(
+      path: AbsolutePath,
+      dialect: Dialect = dialects.Scala213
+  ): List[String] =
+    topLevelSymbols(path.toInput, dialect)
+
   def index(
       language: Language,
-      path: AbsolutePath,
+      input: Input.VirtualFile,
       dialect: Dialect
   ): TextDocument = {
-    val input = path.toInput
     addLines(language, input.text)
     val result =
       if (language.isJava) {
@@ -112,7 +125,7 @@ final class Mtags(implicit rc: ReportContext) {
       }
     Mtags.stdLibPatches
       .patchDocument(
-        path,
+        input.path,
         result
       )
       .withUri(input.path)
@@ -132,7 +145,14 @@ object Mtags {
   def index(path: AbsolutePath, dialect: Dialect)(implicit
       rc: ReportContext = new EmptyReportContext()
   ): TextDocument = {
-    new Mtags().index(path.toLanguage, path, dialect)
+    new Mtags().index(path.toLanguage, path.toInput, dialect)
+  }
+
+  def index(path: SourcePath, dialect: Dialect)(implicit
+      rc: ReportContext,
+      ctx: SourcePath.Context
+  ): TextDocument = {
+    new Mtags().index(path.toLanguage, path.toInput, dialect)
   }
 
   def toplevels(document: TextDocument): List[String] = {
@@ -169,7 +189,7 @@ object Mtags {
   }
 
   def extendedIndexing(
-      path: AbsolutePath,
+      path: Input.VirtualFile,
       dialect: Dialect = dialects.Scala213,
       includeMembers: Boolean = false
   )(implicit
@@ -200,20 +220,26 @@ object Mtags {
     private def isScala3Library(jar: AbsolutePath): Boolean =
       jar.filename.startsWith("scala3-library_3")
 
-    private def isScala3LibraryPatchSource(file: AbsolutePath): Boolean = {
-      !file.parent.isRoot &&
-      file.parent.filename == "stdLibPatches" &&
-      file.jarPath.exists(isScala3Library(_))
-    }
+    private def isScala3LibraryPatchSource(path: String): Boolean =
+      SourcePath(path) match {
+        case z: SourcePath.ZipEntry =>
+          isScala3Library(AbsolutePath(z.zipPath)) && {
+            val segments = z.pathInZip.split("/")
+            segments.length >= 2 &&
+            segments(segments.length - 2) == "stdLibPatches"
+          }
+        case _: SourcePath.Standard =>
+          false
+      }
 
     private def patchSymbol(sym: String): String =
       sym.replace(packageName, "scala")
 
     def patchDocument(
-        file: AbsolutePath,
+        path: String,
         doc: TextDocument
     ): TextDocument = {
-      if (isScala3LibraryPatchSource(file)) {
+      if (isScala3LibraryPatchSource(path)) {
         val occs =
           doc.occurrences.map(occ => occ.copy(symbol = patchSymbol(occ.symbol)))
 

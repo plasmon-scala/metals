@@ -9,6 +9,6 @@ object IndexingExceptions {
   class InvalidSymbolException(val symbol: String, underlying: Throwable)
       extends Exception(symbol, underlying)
 
-  class PathIndexingException(val path: AbsolutePath, underlying: Throwable)
+  class PathIndexingException(val path: String, underlying: Throwable)
       extends Exception(path.toString(), underlying)
 }

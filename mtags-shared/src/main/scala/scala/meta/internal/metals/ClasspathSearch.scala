@@ -6,6 +6,7 @@ import java.util.PriorityQueue
 import scala.meta.internal.mtags.CommonMtagsEnrichments.XtensionJavaPriorityQueue
 import scala.meta.pc.SymbolSearch
 import scala.meta.pc.SymbolSearchVisitor
+import scala.meta.pc.SourcePathContext
 
 class ClasspathSearch(
     val packages: Array[CompressedPackageIndex]
@@ -18,7 +19,7 @@ class ClasspathSearch(
   def search(
       query: WorkspaceSymbolQuery,
       visitor: SymbolSearchVisitor
-  ): (SymbolSearch.Result, Int) = {
+  )(implicit ctx: SourcePathContext): (SymbolSearch.Result, Int) = {
     if (query.query == "_") return (SymbolSearch.Result.COMPLETE, 0)
     val classfiles =
       new PriorityQueue[Classfile](new ClassfileComparator(query.query))
@@ -47,7 +48,7 @@ class ClasspathSearch(
         isContinue
       }
     } {
-      val added = visitor.visitClassfile(hit.pkg, hit.filename)
+      val added = visitor.visitClassfile(hit.pkg, hit.filename, ctx)
       if (added > 0) {
         if (!hit.isExact(query)) nonExactMatches += added
         else exactMatches += added

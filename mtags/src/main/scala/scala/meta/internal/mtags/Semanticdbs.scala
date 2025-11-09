@@ -17,7 +17,9 @@ import scala.meta.internal.{semanticdb => s}
 import scala.meta.io.RelativePath
 
 trait Semanticdbs {
-  def textDocument(path: AbsolutePath): TextDocumentLookup
+  def textDocument(path: SourcePath): TextDocumentLookup
+  final def textDocument(path: AbsolutePath): TextDocumentLookup =
+    textDocument(SourcePath.Standard(path.toNIO))
 }
 object Semanticdbs {
   def loadTextDocuments(path: AbsolutePath): s.TextDocuments = {
@@ -27,7 +29,7 @@ object Semanticdbs {
   }
 
   def loadTextDocument(
-      scalaOrJavaPath: AbsolutePath,
+      scalaOrJavaPath: SourcePath,
       sourceroot: AbsolutePath,
       optScalaVersion: Option[String],
       charset: Charset,
@@ -35,26 +37,28 @@ object Semanticdbs {
       loader: RelativePath => Option[FoundSemanticDbPath],
       log: String => Unit = (_) => ()
   ): TextDocumentLookup = {
-    if (scalaOrJavaPath.toNIO.getFileSystem != sourceroot.toNIO.getFileSystem) {
-      TextDocumentLookup.NotFound(scalaOrJavaPath)
-    } else {
-      val scalaRelativePath = scalaOrJavaPath.toRelative(sourceroot.dealias)
-      val semanticdbRelativePath =
-        SemanticdbClasspath.fromScalaOrJava(scalaRelativePath)
-      loader(semanticdbRelativePath) match {
-        case None =>
-          TextDocumentLookup.NotFound(scalaOrJavaPath)
-        case Some(semanticdbPath) =>
-          loadResolvedTextDocument(
-            scalaOrJavaPath,
-            semanticdbPath.nonDefaultRelPath.getOrElse(scalaRelativePath),
-            semanticdbPath.path,
-            optScalaVersion,
-            charset,
-            fingerprints,
-            log
-          )
-      }
+    scalaOrJavaPath match {
+      case s: SourcePath.Standard =>
+        val scalaRelativePath =
+          AbsolutePath(s.path).toRelative(sourceroot.dealias)
+        val semanticdbRelativePath =
+          SemanticdbClasspath.fromScalaOrJava(scalaRelativePath)
+        loader(semanticdbRelativePath) match {
+          case None =>
+            TextDocumentLookup.NotFound(scalaOrJavaPath.uri)
+          case Some(semanticdbPath) =>
+            loadResolvedTextDocument(
+              AbsolutePath(s.path),
+              semanticdbPath.nonDefaultRelPath.getOrElse(scalaRelativePath),
+              semanticdbPath.path,
+              optScalaVersion,
+              charset,
+              fingerprints,
+              log
+            )
+        }
+      case _ =>
+        TextDocumentLookup.NotFound(scalaOrJavaPath.uri)
     }
   }
 
@@ -83,7 +87,7 @@ object Semanticdbs {
               fingerprints,
               log
             )
-          else TextDocumentLookup.NotFound(scalaPath)
+          else TextDocumentLookup.NotFound(scalaPath.toNIO.toUri.toASCIIString)
         } else
           addIfStaleInfo(
             scalaPath,
@@ -93,7 +97,7 @@ object Semanticdbs {
             fingerprints,
             log
           )
-      case _ => TextDocumentLookup.NotFound(scalaPath)
+      case _ => TextDocumentLookup.NotFound(scalaPath.toNIO.toUri.toASCIIString)
     }
   }
 

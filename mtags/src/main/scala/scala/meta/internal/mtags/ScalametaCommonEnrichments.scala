@@ -200,7 +200,7 @@ trait ScalametaCommonEnrichments extends CommonMtagsEnrichments {
     }
   }
 
-  protected def filenameToLanguage(filename: String): Language = {
+  def filenameToLanguage(filename: String): Language = {
     if (filename.endsWith(".java")) Language.JAVA
     else if (
       filename.endsWith(".scala") || filename.endsWith(".sc")
@@ -329,6 +329,20 @@ trait ScalametaCommonEnrichments extends CommonMtagsEnrichments {
     }
   }
 
+  implicit class XtensionSourcePath(path: SourcePath) {
+
+    def toLanguage: Language =
+      filenameToLanguage(path.uri)
+
+    def readTextOpt(implicit ctx: SourcePath.Context): Option[String] = {
+      if (path.exists()) {
+        Option(path.content())
+      } else {
+        None
+      }
+    }
+  }
+
   implicit class XtensionAbsolutePath(path: AbsolutePath) {
     def isEmptyDirectory: Boolean = {
       path.isDirectory &&
@@ -437,6 +451,17 @@ trait ScalametaCommonEnrichments extends CommonMtagsEnrichments {
 
     def scalaFileName: String =
       path.filename.stripSuffix(".scala").stripSuffix(".sc")
+
+    def toIdeallyRelativeURI(): Option[String] = {
+      val uri = path.toNIO.toUri
+      if (uri.getScheme == "jar")
+        Option(uri.getRawSchemeSpecificPart).map(_.split("!", 2)).collect {
+          case Array(_, subPath) if subPath.startsWith("/") =>
+            subPath.drop(1)
+        }
+      else
+        None
+    }
 
     def toIdeallyRelativeURI(sourceItemOpt: Option[AbsolutePath]): String =
       sourceItemOpt match {
