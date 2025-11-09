@@ -20,6 +20,7 @@ object JavaPcSettings {
           if (version.startsWith("1.")) version.substring(2, 3)
           else version.takeWhile(_ != '.')
         },
+        libraryDependencies += "org.scala-lang.modules" %% "scala-java8-compat" % V.java8Compat,
         Compile / unmanagedJars ++= {
           if (currentJavaVersion.value == "8")
             Seq(
