@@ -703,41 +703,25 @@ class ScalaPresentationCompiler(
     userLogger.accept("Class path:")
     for (file <- this.classpath)
       userLogger.accept(s"  $file")
-    try {
-      new MetalsGlobal(
-        userLogger,
-        settings,
-        new StoreReporter {
-          override def doReport(
-              pos: scala.reflect.internal.util.Position,
-              msg: String,
-              severity: Severity
-          ): Unit = {
-            userLogger.accept(s"$severity [$pos] $msg")
-            super.doReport(pos, msg, severity)
-          }
-        },
-        search,
-        buildTargetIdentifier,
-        config,
-        folderPath,
-        completionItemPriority
-      )
-    } catch {
-      case e: FatalError
-          if scalaVersion.startsWith("2.13") && !withClearedCaches =>
-        val cleared = JrtClasspathCompat.clearJrtClassPathCaches(logger)
-        if (cleared) {
-          userLogger.accept(
-            s"Cleared JrtClassPath caches, to try and fix `${e.getMessage()}`"
-          )
-          newCompiler(withClearedCaches = true)
-        } else {
-          throw e
+    new MetalsGlobal(
+      userLogger,
+      settings,
+      new StoreReporter {
+        override def doReport(
+            pos: scala.reflect.internal.util.Position,
+            msg: String,
+            severity: Severity
+        ): Unit = {
+          userLogger.accept(s"$severity [$pos] $msg")
+          super.doReport(pos, msg, severity)
         }
-      case e: FatalError =>
-        throw e
-    }
+      },
+      search,
+      buildTargetIdentifier,
+      config,
+      folderPath,
+      completionItemPriority
+    )
   }
 
   // ================
