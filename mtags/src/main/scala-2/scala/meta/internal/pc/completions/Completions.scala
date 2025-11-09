@@ -19,6 +19,7 @@ import scala.meta.internal.pc.MemberOrdering
 import scala.meta.internal.pc.MetalsGlobal
 
 import org.eclipse.{lsp4j => l}
+import scala.meta.internal.mtags.GlobalSymbolIndex
 
 /**
  * Utility methods for completions.
@@ -306,7 +307,7 @@ trait Completions { this: MetalsGlobal =>
   ): String =
     sym match {
       case m: MethodSymbol =>
-        new SignaturePrinter(m, history, info, includeDocs = false)
+        new SignaturePrinter(m, history, info, moduleIfIncludeDocs = None)
           .defaultMethodSignature(allowNewLines = false)
       case _ =>
         def fullName(s: Symbol): String =
@@ -466,6 +467,7 @@ trait Completions { this: MetalsGlobal =>
   }
 
   def completionPosition(
+      module: GlobalSymbolIndex.Module,
       pos: Position,
       source: URI,
       text: String,
@@ -478,6 +480,7 @@ trait Completions { this: MetalsGlobal =>
     // enforce discipline in the code.
     try
       completionPositionUnsafe(
+        module,
         pos,
         source,
         text,
@@ -492,6 +495,7 @@ trait Completions { this: MetalsGlobal =>
     }
   }
   def completionPositionUnsafe(
+      module: GlobalSymbolIndex.Module,
       pos: Position,
       source: URI,
       text: String,
@@ -509,6 +513,7 @@ trait Completions { this: MetalsGlobal =>
           val moveToNewLine = ident.pos.line == apply.pos.line
           val addNewLineAfter = apply.pos.focusEnd.line == ident.pos.line
           CaseKeywordCompletion(
+            module,
             EmptyTree,
             editRange,
             pos,
@@ -560,6 +565,7 @@ trait Completions { this: MetalsGlobal =>
         }
       case CaseExtractors.CaseExtractor(selector, parent) =>
         CaseKeywordCompletion(
+          module,
           selector,
           editRange,
           pos,
@@ -569,6 +575,7 @@ trait Completions { this: MetalsGlobal =>
         )
       case CaseExtractors.CasePatternExtractor(selector, parent, name) =>
         CaseKeywordCompletion(
+          module,
           selector,
           editRange,
           pos,
@@ -579,6 +586,7 @@ trait Completions { this: MetalsGlobal =>
         )
       case CaseExtractors.TypedCasePatternExtractor(selector, parent, name) =>
         CaseKeywordCompletion(
+          module,
           selector,
           editRange,
           pos,
@@ -593,6 +601,7 @@ trait Completions { this: MetalsGlobal =>
         FilenameCompletion(c, p, pos, editRange)
       case OverrideExtractor(name, template, start, isCandidate) =>
         OverrideCompletion(
+          module,
           name,
           template,
           pos,
@@ -612,6 +621,7 @@ trait Completions { this: MetalsGlobal =>
         )
       case _ =>
         inferCompletionPosition(
+          module,
           pos,
           source,
           text,
@@ -632,6 +642,7 @@ trait Completions { this: MetalsGlobal =>
     }
 
   private def inferCompletionPosition(
+      module: GlobalSymbolIndex.Module,
       pos: Position,
       source: URI,
       text: String,
@@ -652,6 +663,7 @@ trait Completions { this: MetalsGlobal =>
               t.results.collectFirst {
                 case result if result.prefix.isDefined =>
                   MatchKeywordCompletion(
+                    module,
                     result.prefix,
                     editRange,
                     pos,
@@ -678,6 +690,7 @@ trait Completions { this: MetalsGlobal =>
             }
           case _ =>
             inferCompletionPosition(
+              module,
               pos,
               source,
               text,
@@ -695,7 +708,15 @@ trait Completions { this: MetalsGlobal =>
       case New(_) :: _ =>
         NewCompletion
       case head :: tail if !head.pos.includes(pos) =>
-        inferCompletionPosition(pos, source, text, tail, completions, editRange)
+        inferCompletionPosition(
+          module,
+          pos,
+          source,
+          text,
+          tail,
+          completions,
+          editRange
+        )
       case _ =>
         NoneCompletion
     }

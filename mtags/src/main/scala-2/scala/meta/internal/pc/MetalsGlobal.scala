@@ -46,7 +46,7 @@ class MetalsGlobal(
     settings: Settings,
     reporter: Reporter,
     val search: SymbolSearch,
-    val buildTargetIdentifier: String,
+    val moduleString: String,
     val metalsConfig: PresentationCompilerConfig,
     val workspace: Option[Path],
     val completionItemPriority: CompletionItemPriority
@@ -297,7 +297,7 @@ class MetalsGlobal(
         visitMember
       )
       searchOutline(visitMember, query)
-      search.search(query, buildTargetIdentifier, visitor, ctx.iface)
+      search.search(query, moduleString, visitor, ctx.iface)
     }
   }
 
@@ -323,6 +323,7 @@ class MetalsGlobal(
   }
 
   def symbolDocumentation(
+      module: m.internal.mtags.GlobalSymbolIndex.Module,
       symbol: Symbol,
       contentType: m.pc.ContentType = m.pc.ContentType.MARKDOWN
   ): Option[SymbolDocumentation] = {
@@ -332,6 +333,7 @@ class MetalsGlobal(
     )
     val sym = toSemanticdbSymbol(symbol)
     val documentation = search.documentation(
+      module.asString,
       sym,
       new ParentSymbols {
         def parents(): util.List[String] = {
