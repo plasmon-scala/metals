@@ -1,7 +1,7 @@
 name: Release
 on:
   push:
-    branches: [main]
+    branches: [plasmon]
     tags: ["**"]
 concurrency:
   group: release-${{ github.ref }}
@@ -22,13 +22,7 @@ jobs:
       - name: Publish to Sonatype
         run: sbt ci-release
         env:
-          PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
-          PGP_SECRET: ${{ secrets.PGP_SECRET }}
-          SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
-          SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
-      - name: Publish Documentation
-        if: ${{ !contains(github.ref_name, '@') }}
-        run: sbt docs/docusaurusPublishGhpages
-        env:
-          GIT_USER: scalameta@scalameta.org
-          GIT_DEPLOY_KEY: ${{ secrets.GIT_DEPLOY_KEY }}
+          PGP_PASSPHRASE: ${{ secrets.PUBLISH_SECRET_KEY_PASSWORD }}
+          PGP_SECRET: ${{ secrets.PUBLISH_SECRET_KEY_BASE64 }}
+          SONATYPE_PASSWORD: ${{ secrets.PUBLISH_PASSWORD }}
+          SONATYPE_USERNAME: ${{ secrets.PUBLISH_USER }}
