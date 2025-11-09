@@ -8,6 +8,7 @@ import scala.meta.pc.OffsetParams
 import org.eclipse.lsp4j.ParameterInformation
 import org.eclipse.lsp4j.SignatureHelp
 import org.eclipse.lsp4j.SignatureInformation
+import scala.meta.internal.mtags.GlobalSymbolIndex
 
 class SignatureHelpProvider(val compiler: MetalsGlobal)(implicit
     queryInfo: PcQueryContext
@@ -15,6 +16,7 @@ class SignatureHelpProvider(val compiler: MetalsGlobal)(implicit
   import compiler._
 
   def signatureHelp(
+      module: GlobalSymbolIndex.Module,
       params: OffsetParams
   ): SignatureHelp = {
     val unit = addCompilationUnit(
@@ -30,7 +32,10 @@ class SignatureHelpProvider(val compiler: MetalsGlobal)(implicit
       enclosingCall <- new MethodCallTraverser(unit, pos).fromTree(
         typedEnclosing
       )
-    } yield toSignatureHelp(enclosingCall)) getOrElse new SignatureHelp()
+    } yield toSignatureHelp(
+      module,
+      enclosingCall
+    )) getOrElse new SignatureHelp()
   }
 
   private def safeTypedTreeAt(pos: Position): Option[Tree] =
@@ -496,7 +501,10 @@ class SignatureHelpProvider(val compiler: MetalsGlobal)(implicit
 
   case class ParamIndex(j: Int, param: Symbol)
 
-  def toSignatureHelp(t: EnclosingMethodCall): SignatureHelp = {
+  def toSignatureHelp(
+      module: GlobalSymbolIndex.Module,
+      t: EnclosingMethodCall
+  ): SignatureHelp = {
     val activeParent = t.call.nonOverload
     var activeSignature: Integer = null
     var activeParameter: Integer = null
@@ -532,6 +540,7 @@ class SignatureHelpProvider(val compiler: MetalsGlobal)(implicit
             paramss
           }
         toSignatureInformation(
+          module,
           t,
           method,
           if (!t.call.isUnapplyMethod) tpe else method.info,
@@ -588,6 +597,7 @@ class SignatureHelpProvider(val compiler: MetalsGlobal)(implicit
   }
 
   def toSignatureInformation(
+      module: GlobalSymbolIndex.Module,
       t: EnclosingMethodCall,
       method: Symbol,
       methodType: Type,
@@ -602,7 +612,7 @@ class SignatureHelpProvider(val compiler: MetalsGlobal)(implicit
       method,
       shortenedNames,
       methodType,
-      includeDocs = true
+      moduleIfIncludeDocs = Some(module)
     )
     val paramLabels = mparamss.zipWithIndex.flatMap { case (params, i) =>
       val byName: Map[Name, Int] =

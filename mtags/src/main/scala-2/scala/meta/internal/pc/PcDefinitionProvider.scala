@@ -9,15 +9,16 @@ import scala.meta.pc.DefinitionResult
 import scala.meta.pc.OffsetParams
 
 import org.eclipse.lsp4j.Location
+import scala.meta.internal.mtags.GlobalSymbolIndex
 
 class PcDefinitionProvider(val compiler: MetalsGlobal, params: OffsetParams) {
   import compiler._
 
-  def definition(): DefinitionResult =
-    definition(findTypeDef = false)
+  def definition(module: GlobalSymbolIndex.Module): DefinitionResult =
+    definition(module, findTypeDef = false)
 
-  def typeDefinition(): DefinitionResult =
-    definition(findTypeDef = true)
+  def typeDefinition(module: GlobalSymbolIndex.Module): DefinitionResult =
+    definition(module, findTypeDef = true)
 
   private def typeSymbol(tree: Tree, pos: Position) = {
     val expanded = expandRangeToEnclosingApply(pos)
@@ -55,7 +56,10 @@ class PcDefinitionProvider(val compiler: MetalsGlobal, params: OffsetParams) {
     }
   }
 
-  private def definition(findTypeDef: Boolean): DefinitionResult =
+  private def definition(
+      module: GlobalSymbolIndex.Module,
+      findTypeDef: Boolean
+  ): DefinitionResult =
     if (params.offset() == 0) {
       DefinitionResultImpl.empty
     } else {
@@ -100,10 +104,14 @@ class PcDefinitionProvider(val compiler: MetalsGlobal, params: OffsetParams) {
                 if (symbol.isSynthetic) List(qualifier.symbol)
                 else List(qualifier.symbol, qualifier.symbol.companionClass)
 
-              findDefinitionLocationsForSymbol(unit, symbol) ++ optClassSymbol
+              findDefinitionLocationsForSymbol(
+                module,
+                unit,
+                symbol
+              ) ++ optClassSymbol
                 .filter(_.exists)
-                .flatMap(findDefinitionLocationsForSymbol(unit, _))
-            case _ => findDefinitionLocationsForSymbol(unit, symbol)
+                .flatMap(findDefinitionLocationsForSymbol(module, unit, _))
+            case _ => findDefinitionLocationsForSymbol(module, unit, symbol)
           }
 
         DefinitionResultImpl(
@@ -114,6 +122,7 @@ class PcDefinitionProvider(val compiler: MetalsGlobal, params: OffsetParams) {
     }
 
   private def findDefinitionLocationsForSymbol(
+      module: GlobalSymbolIndex.Module,
       unit: RichCompilationUnit,
       symbol: Symbol
   ): List[Location] =
@@ -135,7 +144,7 @@ class PcDefinitionProvider(val compiler: MetalsGlobal, params: OffsetParams) {
         .sorted
         .flatMap { sym =>
           if (sym.isGlobal) {
-            search.definition(sym, params.uri()).asScala
+            search.definition(module.asString, sym, params.uri()).asScala
           } else Nil
         }
     }

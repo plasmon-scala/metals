@@ -37,36 +37,47 @@ import java.nio.charset.StandardCharsets
  * Handles both javadoc and scaladoc.
  */
 class Docstrings(index: GlobalSymbolIndex)(implicit rc: ReportContext) {
-  val cache = new TrieMap[Content, SymbolDocumentation]()
+  val cache =
+    new TrieMap[(Content, GlobalSymbolIndex.Module), SymbolDocumentation]()
   private val logger0 = Logger.getLogger(classOf[Docstrings].getName)
 
+  def reset(): Unit =
+    cache.clear()
+
   def documentation(
+      module: GlobalSymbolIndex.Module,
       symbol: String,
       parents: ParentSymbols,
       contentType: ContentType,
       logger: java.util.function.Consumer[String]
   )(implicit ctx: SourcePath.Context): Optional[SymbolDocumentation] = {
-    val result = getFromCacheWithProxy(symbol, contentType) match {
-      case Some(value) =>
-        if (value == EmptySymbolDocumentation) None
-        else Some(value)
-      case None =>
-        indexSymbol(symbol, contentType, logger)
-        val result = getFromCacheWithProxy(symbol, contentType)
-        if (result.isEmpty)
-          cache(Content.from(symbol, contentType)) = EmptySymbolDocumentation
-        result
-    }
+    val content = Content.from(symbol, contentType)
+    if (!cache.contains((content, module)))
+      indexSymbol(module, symbol, contentType, logger)
+    val result0 = cache.get((content, module))
+    if (result0.isEmpty)
+      cache((content, module)) = EmptySymbolDocumentation
+    val result = result0.filter(_ != EmptySymbolDocumentation)
     /* Fall back to parent javadocs/scaladocs if nothing is specified for the current symbol
      * This way we also cache the result in order not to calculate parents again.
      */
     val resultWithParentDocs = result match {
       case Some(value: MetalsSymbolDocumentation)
           if value.docstring.isEmpty() =>
-        Some(parentDocumentation(symbol, value, parents, contentType, logger))
+        Some(
+          parentDocumentation(
+            module,
+            symbol,
+            value,
+            parents,
+            contentType,
+            logger
+          )
+        )
       case None =>
         Some(
           parentDocumentation(
+            module,
             symbol,
             MetalsSymbolDocumentation.empty(symbol),
             parents,
@@ -80,6 +91,7 @@ class Docstrings(index: GlobalSymbolIndex)(implicit rc: ReportContext) {
   }
 
   def parentDocumentation(
+      module: GlobalSymbolIndex.Module,
       symbol: String,
       docs: MetalsSymbolDocumentation,
       parents: ParentSymbols,
@@ -90,28 +102,29 @@ class Docstrings(index: GlobalSymbolIndex)(implicit rc: ReportContext) {
       .parents()
       .asScala
       .flatMap { s =>
-        getFromCacheWithProxy(s, contentType).orElse {
-          indexSymbol(s, contentType, logger)
-          getFromCacheWithProxy(s, contentType)
-        }
+        val content = Content.from(s, contentType)
+        if (!cache.contains((content, module)))
+          indexSymbol(module, s, contentType, logger)
+        getFromCacheWithProxy(module, s, contentType)
       }
       .find(_.docstring().nonEmpty)
       .fold {
         docs
       } { withDocs =>
         val updated = docs.copy(docstring = withDocs.docstring())
-        cache(Content.from(symbol, contentType)) = updated
+        cache((Content.from(symbol, contentType), module)) = updated
         updated
       }
   }
 
   private def getFromCacheWithProxy(
+      module: GlobalSymbolIndex.Module,
       symbol: String,
       contentType: ContentType
   ): Option[SymbolDocumentation] = {
-    cache.get(Content.from(symbol, contentType)) match {
+    cache.get((Content.from(symbol, contentType), module)) match {
       case Some(ProxySymbolDocumentation(alternativeSymbol)) =>
-        cache.get(Content.from(alternativeSymbol, contentType))
+        cache.get((Content.from(alternativeSymbol, contentType), module))
       case res => res
     }
   }
@@ -126,40 +139,46 @@ class Docstrings(index: GlobalSymbolIndex)(implicit rc: ReportContext) {
    *
    * @param path the absolute path for the source file to update.
    */
-  def expireSymbolDefinition(path: AbsolutePath, dialect: Dialect): Unit = {
+  def expireSymbolDefinition(
+      module: GlobalSymbolIndex.Module,
+      path: AbsolutePath,
+      dialect: Dialect
+  ): Unit = {
     path.toLanguage match {
       case Language.SCALA =>
-        new Deindexer(path.toInput, dialect).indexRoot()
+        new Deindexer(module, path.toInput, dialect).indexRoot()
       case _ =>
     }
   }
 
   private def cacheSymbol(
+      module: GlobalSymbolIndex.Module,
       doc: SymbolDocumentation,
       contentType: ContentType
   ): Unit = {
-    cache(Content.from(doc.symbol(), contentType)) = doc
+    cache((Content.from(doc.symbol(), contentType), module)) = doc
   }
 
   private def indexSymbol(
+      module: GlobalSymbolIndex.Module,
       symbol: String,
       contentType: ContentType,
       logger: java.util.function.Consumer[String]
   )(implicit ctx: SourcePath.Context): Unit = {
-    index.definition(Symbol(symbol)) match {
+    index.definition(module, Symbol(symbol)) match {
       case Some(defn) =>
         try {
           if (logger != null)
-            logger.accept(s"Indexing javadoc / scaladoc of $symbol")
-          indexSymbolDefinition(defn, contentType)
-          maybeCacheAlternative(defn, contentType)
+            logger.accept(s"Indexing javadoc / scaladoc of $symbol in $module")
+          indexSymbolDefinition(module, defn, contentType)
+          maybeCacheAlternative(module, defn, contentType)
           if (logger != null) logger.accept("Done indexing javadoc / scaladoc")
         } catch {
           case NonFatal(e) =>
             logger0.log(Level.SEVERE, defn.path.uri.toString, e)
             if (logger != null) {
               logger.accept(
-                s"Error while indexing javadoc / scaladoc of $symbol"
+                s"Error while indexing javadoc / scaladoc of $symbol in $module"
               )
               val baos = new ByteArrayOutputStream
               e.printStackTrace(
@@ -175,12 +194,13 @@ class Docstrings(index: GlobalSymbolIndex)(implicit rc: ReportContext) {
   }
 
   private def maybeCacheAlternative(
+      module: GlobalSymbolIndex.Module,
       defn: SymbolDefinition,
       contentType: ContentType
   ) = {
     val defSymbol = defn.definitionSymbol.value
     val querySymbol = defn.querySymbol.value
-    lazy val queryContent = Content.from(querySymbol, contentType)
+    lazy val queryContent = (Content.from(querySymbol, contentType), module)
 
     if (
       defSymbol != querySymbol && cache.get(queryContent).forall {
@@ -191,23 +211,27 @@ class Docstrings(index: GlobalSymbolIndex)(implicit rc: ReportContext) {
   }
 
   private def indexSymbolDefinition(
+      module: GlobalSymbolIndex.Module,
       defn: SymbolDefinition,
       contentType: ContentType
   )(implicit ctx: SourcePath.Context): Unit = {
     filenameToLanguage(defn.path.uri) match {
       case Language.JAVA =>
         JavadocIndexer
-          .foreach(defn.path.toInput, contentType)(cacheSymbol(_, contentType))
+          .foreach(defn.path.toInput, contentType)(
+            cacheSymbol(module, _, contentType)
+          )
       case Language.SCALA =>
         ScaladocIndexer
           .foreach(defn.path.toInput, defn.dialect, contentType)(
-            cacheSymbol(_, contentType)
+            cacheSymbol(module, _, contentType)
           )
       case _ =>
     }
   }
 
   private class Deindexer(
+      module: GlobalSymbolIndex.Module,
       input: Input.VirtualFile,
       dialect: Dialect
   ) extends ScalaMtags(input, dialect) {
@@ -218,7 +242,7 @@ class Docstrings(index: GlobalSymbolIndex)(implicit rc: ReportContext) {
     ): Unit = {
       for {
         contentType <- ContentType.values()
-      } cache.remove(Content.from(sinfo.symbol, contentType))
+      } cache.remove((Content.from(sinfo.symbol, contentType), module))
     }
   }
 

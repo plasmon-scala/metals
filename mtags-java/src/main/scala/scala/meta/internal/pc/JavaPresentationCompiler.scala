@@ -38,7 +38,7 @@ import org.eclipse.lsp4j.TextEdit
 
 case class JavaPresentationCompiler(
     logger: java.util.function.Consumer[String],
-    buildTargetIdentifier: String = "",
+    moduleString: String,
     classpath: Seq[Path] = Nil,
     options: List[String] = Nil, // unused?
     search: SymbolSearch = EmptySymbolSearch,
@@ -49,9 +49,7 @@ case class JavaPresentationCompiler(
 ) extends PresentationCompiler {
 
   private lazy val javaCompiler = {
-    logger.accept(
-      s"Creating new Java presentation compiler for $buildTargetIdentifier"
-    )
+    logger.accept(s"Creating new Java presentation compiler for $moduleString")
     logger.accept("Class path:")
     for (p <- classpath)
       logger.accept(s"  $p")
@@ -90,7 +88,7 @@ case class JavaPresentationCompiler(
           config.hoverContentType(),
           logger
         )
-          .hover()
+          .hover(moduleString)
           .orNull
       )
     )
@@ -208,12 +206,12 @@ case class JavaPresentationCompiler(
     copy(workspace = Some(workspace))
 
   override def newInstance(
-      buildTargetIdentifier: String,
+      moduleString: String,
       classpath: util.List[Path],
       options: util.List[String]
   ): PresentationCompiler =
     copy(
-      buildTargetIdentifier = buildTargetIdentifier,
+      moduleString = moduleString,
       classpath = classpath.asScala.toSeq,
       options = options.asScala.toList
     )

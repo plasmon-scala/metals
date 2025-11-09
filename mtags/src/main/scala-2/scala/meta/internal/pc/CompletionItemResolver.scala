@@ -8,12 +8,17 @@ import scala.meta.internal.jdk.CollectionConverters._
 import scala.meta.internal.mtags.MtagsEnrichments._
 
 import org.eclipse.lsp4j.CompletionItem
+import scala.meta.internal.mtags.GlobalSymbolIndex
 
 class CompletionItemResolver(
     val compiler: MetalsGlobal
 ) extends ItemResolver {
   import compiler._
-  def resolve(item: CompletionItem, msym: String): CompletionItem = {
+  def resolve(
+      module: GlobalSymbolIndex.Module,
+      item: CompletionItem,
+      msym: String
+  ): CompletionItem = {
 
     val data = item.data.getOrElse(CompletionItemData.empty)
 
@@ -22,25 +27,29 @@ class CompletionItemResolver(
       !data.additionalSymbols.isEmpty()
     ) {
       data.additionalSymbols.asScala.foldLeft(item) { case (item, sym) =>
-        handleSymbol(item, sym)
+        handleSymbol(module, item, sym)
       }
     } else {
-      handleSymbol(item, msym)
+      handleSymbol(module, item, msym)
     }
   }
 
-  private def handleSymbol(item: CompletionItem, msym: String) = {
+  private def handleSymbol(
+      module: GlobalSymbolIndex.Module,
+      item: CompletionItem,
+      msym: String
+  ) = {
     val gsym = inverseSemanticdbSymbol(msym)
     if (gsym != NoSymbol) {
-      symbolDocumentation(gsym).orElse(
-        symbolDocumentation(gsym.companion)
+      symbolDocumentation(module, gsym).orElse(
+        symbolDocumentation(module, gsym.companion)
       ) match {
         case Some(info) if item.getDetail != null =>
           enrichDocs(
             item,
             info,
             metalsConfig,
-            fullDocstring(gsym),
+            fullDocstring(module, gsym),
             isJavaSymbol(gsym)
           )
         case _ =>
@@ -51,10 +60,10 @@ class CompletionItemResolver(
     }
   }
 
-  def fullDocstring(gsym: Symbol): String =
+  def fullDocstring(module: GlobalSymbolIndex.Module, gsym: Symbol): String =
     try {
       def docs(gsym: Symbol): String =
-        symbolDocumentation(gsym).fold("")(_.docstring())
+        symbolDocumentation(module, gsym).fold("")(_.docstring())
       val gsymDoc = docs(gsym)
       def keyword(gsym: Symbol): String =
         if (gsym.isClass) "class"
@@ -66,11 +75,11 @@ class CompletionItemResolver(
       if (companion == NoSymbol || isJavaSymbol(gsym)) {
         if (gsymDoc.isEmpty) {
           if (gsym.isAliasType) {
-            fullDocstring(gsym.info.dealias.typeSymbol)
+            fullDocstring(module, gsym.info.dealias.typeSymbol)
           } else if (gsym.isMethod) {
             gsym.info.finalResultType match {
               case SingleType(_, sym) =>
-                fullDocstring(sym)
+                fullDocstring(module, sym)
               case _ =>
                 ""
             }

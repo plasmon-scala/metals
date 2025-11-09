@@ -10,6 +10,7 @@ import scala.meta.pc
 import scala.meta.pc.SymbolDocumentation
 
 import org.eclipse.{lsp4j => l}
+import scala.meta.internal.mtags.GlobalSymbolIndex
 
 trait Signatures { compiler: MetalsGlobal =>
 
@@ -289,15 +290,13 @@ trait Signatures { compiler: MetalsGlobal =>
       gsym: Symbol,
       shortenedNames: ShortenedNames,
       gtpe: Type,
-      includeDocs: Boolean,
+      moduleIfIncludeDocs: Option[GlobalSymbolIndex.Module],
       includeDefaultParam: Boolean = true,
       printLongType: Boolean = true
   )(implicit queryInfo: PcQueryContext) {
     private val info: Option[SymbolDocumentation] =
-      if (includeDocs) {
-        symbolDocumentation(gsym)
-      } else {
-        None
+      moduleIfIncludeDocs.flatMap { module =>
+        symbolDocumentation(module, gsym)
       }
     private val infoParamsA: Seq[pc.SymbolDocumentation] = info match {
       case Some(value) =>

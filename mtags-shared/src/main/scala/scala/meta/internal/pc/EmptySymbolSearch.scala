@@ -30,11 +30,16 @@ object EmptySymbolSearch extends SymbolSearch {
     SymbolSearch.Result.COMPLETE
   }
 
-  override def definition(symbol: String, source: URI): ju.List[Location] = {
+  override def definition(
+      moduleString: String,
+      symbol: String,
+      source: URI
+  ): ju.List[Location] = {
     ju.Collections.emptyList()
   }
 
   override def definitionSourceToplevels(
+      moduleString: String,
       symbol: String,
       sourceUri: URI
   ): ju.List[String] = {
@@ -42,6 +47,7 @@ object EmptySymbolSearch extends SymbolSearch {
   }
 
   override def documentation(
+      moduleString: String,
       symbol: String,
       parents: ParentSymbols,
       logger: java.util.function.Consumer[String]
@@ -49,6 +55,7 @@ object EmptySymbolSearch extends SymbolSearch {
     Optional.empty()
 
   override def documentation(
+      moduleString: String,
       symbol: String,
       parents: ParentSymbols,
       docstringContentType: ContentType,
