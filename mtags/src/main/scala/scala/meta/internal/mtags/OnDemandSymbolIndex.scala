@@ -10,6 +10,9 @@ import scala.meta.Dialect
 import scala.meta.dialects
 import scala.meta.internal.io.{ListFiles => _}
 import scala.meta.internal.metals.ScalaVersions
+import scala.meta.internal.mtags.ScalametaCommonEnrichments._
+import scala.meta.internal.semanticdb.Scala._
+import scala.meta.internal.{semanticdb => s}
 import scala.meta.io.AbsolutePath
 import scala.meta.pc.reports.ReportContext
 import java.nio.file.Path
@@ -48,16 +51,20 @@ final class OnDemandSymbolIndex(
   }
   private val onErrorOption = onError.andThen(_ => None)
 
-  private def newRootBucket(): SymbolIndexBucket =
-    SymbolIndexBucket.empty(
+  private def newRootBucket(): SymbolIndexBucket = {
+    lazy val bucket: SymbolIndexBucket = SymbolIndexBucket.empty(
       scala.meta.dialects.Scala213Source3, // unused anyway
       mtags,
       sourceJars(),
       toIndexSource,
       onError,
       javaHome,
-      javaOnly = true
+      javaOnly = true,
+      addTextDocuments =
+        (origin, path, docs) => addTextDocuments(bucket, origin, path, docs)
     )
+    bucket
+  }
 
   private var rootBucket = newRootBucket()
 
@@ -113,7 +120,7 @@ final class OnDemandSymbolIndex(
     tryRun(
       dir.toString,
       List.empty,
-      getOrCreateBucket(dialect, module).addSourceDirectory(dir)
+      getOrCreateBucket(dialect, module).addSourceDirectory(module, dir)
     )
 
   // Traverses all source files in the given jar file and records
@@ -176,27 +183,11 @@ final class OnDemandSymbolIndex(
   def addIndexedSourceJar(
       module: GlobalSymbolIndex.Module,
       jar: AbsolutePath,
-      symbols: List[(String, SourcePath)],
+      symbols: List[(String, SourcePath.ZipEntry)],
       dialect: Dialect
   ): Unit = {
     getOrCreateBucket(dialect, module).addIndexedSourceJar(jar, symbols)
   }
-
-  // Enters nontrivial toplevel symbols for Scala source files.
-  // All other symbols can be inferred on the fly.
-  override def addSourceFile(
-      module: GlobalSymbolIndex.Module,
-      source: SourcePath,
-      dialect: Dialect
-  )(implicit ctx: SourcePath.Context): Option[IndexingResult] =
-    tryRun(
-      source.uri,
-      None, {
-        indexedSources += 1
-        getOrCreateBucket(dialect, module)
-          .addSourceFile(source.toInput, isJava = false)
-      }
-    )
 
   def addToplevelSymbol(
       module: GlobalSymbolIndex.Module,
@@ -205,7 +196,12 @@ final class OnDemandSymbolIndex(
       toplevel: String,
       dialect: Dialect
   ): Unit =
-    getOrCreateBucket(dialect, module).addToplevelSymbol(path, source, toplevel)
+    getOrCreateBucket(dialect, module).addToplevelSymbol(
+      path,
+      module,
+      source,
+      toplevel
+    )
 
   private def tryRun[A](path: String, fallback: => A, thunk: => A): A =
     try thunk
@@ -243,6 +239,41 @@ final class OnDemandSymbolIndex(
       topLevelSymbol: Symbol
   )(implicit ctx: SourcePath.Context): List[(SourcePath, Dialect)] = {
     dialectBuckets.values.flatMap(_.findFileForToplevel(topLevelSymbol)).toList
+  }
+
+  // Records all global symbol definitions.
+  private def addTextDocuments(
+      mainBucket: SymbolIndexBucket,
+      originOpt: Option[Either[AbsolutePath, GlobalSymbolIndex.Module]],
+      path: SourcePath,
+      docs: s.TextDocuments
+  ): Unit = {
+    val originOpt0 = path match {
+      case z: SourcePath.ZipEntry => Some(Left(z.zipPath))
+      case _: SourcePath.Standard => originOpt.map(_.left.map(_.toNIO))
+    }
+    val buckets: Seq[SymbolIndexBucket] = originOpt0 match {
+      case Some(Left(path)) =>
+        dialectBuckets.valuesIterator
+          .filter(_.sourceJars.hasEntry(path))
+          .toVector
+      case Some(Right(module)) => ???
+      case None =>
+        scribe.warn("???")
+        Seq(mainBucket)
+    }
+
+    for {
+      document <- docs.documents
+      occ <- document.occurrences
+      // we only care about global symbol definitions
+      if occ.symbol.isGlobal && occ.role.isDefinition
+      bucket <- buckets
+    }
+      bucket.definitions.updateWith(occ.symbol) {
+        case Some(acc) => Some(acc + SymbolLocation(path, occ.range))
+        case None => Some(Set(SymbolLocation(path, occ.range)))
+      }
   }
 
 }
