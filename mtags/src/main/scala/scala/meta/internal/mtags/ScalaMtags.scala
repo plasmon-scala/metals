@@ -34,7 +34,8 @@ class ScalaMtags(
   override def indexRoot(): Unit = {
     root match {
       case Parsed.Success(tree) => apply(tree)
-      case _ => // do nothing in case of parse error
+      case err: Parsed.Error =>
+        scribe.warn(s"Error parsing ${input.path}: ${err.message}", err.details)
     }
   }
 
@@ -405,6 +406,21 @@ class ScalaMtags(
             enterGiven(name, pos, t.tparams, t.sparams)
           }
         case _: Pkg.Body | _: Template.Body =>
+          continue()
+        case e: Export =>
+          e.importers.map { i =>
+            val exports = i.importees
+              .collect {
+                case n: Importee.Name =>
+                  (n.name.value, n.pos)
+                case n: Importee.Rename =>
+                  (n.rename.value, n.pos)
+              }
+            withFileOwner {
+              for ((exp, pos) <- exports)
+                method(exp, "()", pos, 0)
+            }
+          }
           continue()
         case _ =>
           stop()

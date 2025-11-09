@@ -100,9 +100,10 @@ final class Mtags(implicit rc: ReportContext) {
   }
 
   def topLevelSymbols(
-      input: Input.VirtualFile
+      input: Input.VirtualFile,
+      logger: Consumer[String]
   ): List[String] = {
-    topLevelSymbols(input, dialects.Scala213)
+    topLevelSymbols(input, dialects.Scala213, logger)
   }
 
   def topLevelSymbols(
@@ -116,7 +117,7 @@ final class Mtags(implicit rc: ReportContext) {
       dialect: Dialect,
       logger: Consumer[String]
   ): List[String] = {
-    toplevels(input, dialect, logger).occurrences.iterator
+    toplevels(input, dialect, logger = logger).occurrences.iterator
       .filterNot(_.symbol.isPackage)
       .map(_.symbol)
       .toList
@@ -124,9 +125,10 @@ final class Mtags(implicit rc: ReportContext) {
 
   def topLevelSymbols(
       path: AbsolutePath,
-      dialect: Dialect = dialects.Scala213
+      dialect: Dialect = dialects.Scala213,
+      logger: Consumer[String] = null
   ): List[String] =
-    topLevelSymbols(path.toInput, dialect)
+    topLevelSymbols(path.toInput, dialect, logger)
 
   def index(
       language: Language,
