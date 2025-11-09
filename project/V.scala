@@ -65,7 +65,7 @@ object V {
 
   val munit = "1.2.4"
 
-  val pprint = "0.7.3"
+  val pprint = "0.8.1"
 
   val sbtBloop = bloop
 
