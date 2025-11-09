@@ -719,7 +719,7 @@ lazy val metalsDependencies = project
       // not available for Scala 2.13.13
       // "org.typelevel" % "kind-projector" % V.kindProjector cross CrossVersion.full,
       "com.olegpy" %% "better-monadic-for" % V.betterMonadicFor,
-      "com.lihaoyi" % "mill-contrib-testng" % V.mill,
+      "com.lihaoyi" % "mill-contrib-testng" % V.mill intransitive (),
       "org.virtuslab.scala-cli" % "cli_3" % V.scalaCli intransitive (),
       "ch.epfl.scala" % "bloop-maven-plugin" % V.mavenBloop,
       "ch.epfl.scala" %% "gradle-bloop" % V.gradleBloop,
