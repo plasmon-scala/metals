@@ -2,6 +2,7 @@ package scala.meta.internal.pc
 
 import java.io.Closeable
 import java.net.URI
+import java.net.URL
 import java.nio.file.Path
 import java.util
 import java.util.logging.Level
@@ -18,6 +19,11 @@ import scala.reflect.internal.{Flags => gf}
 import scala.reflect.io.VirtualFile
 import scala.tools.nsc.Mode
 import scala.tools.nsc.Settings
+import scala.tools.nsc.classpath.ClassFileEntry
+import scala.tools.nsc.classpath.ClassPathEntries
+import scala.tools.nsc.classpath.PackageEntry
+import scala.tools.nsc.classpath.PackageName
+import scala.tools.nsc.classpath.SourceFileEntry
 import scala.tools.nsc.interactive.Global
 import scala.tools.nsc.interactive.GlobalProxy
 import scala.tools.nsc.interactive.InteractiveAnalyzer
@@ -38,12 +44,34 @@ import scala.meta.pc.SymbolDocumentation
 import scala.meta.pc.SymbolSearch
 
 import org.eclipse.{lsp4j => l}
+import scala.tools.nsc.util.ClassPath
+import scala.reflect.io.FileZipArchive
+import scala.tools.nsc.classpath.FileUtils
+
 import java.util.concurrent.ConcurrentHashMap
 import java.io.PrintStream
 import java.io.ByteArrayOutputStream
 import java.nio.charset.StandardCharsets
+import java.io.File
+import java.nio.file.Paths
+import scala.tools.nsc.classpath.metals
+
+object MetalsGlobal {
+  private val fzaCache = new ConcurrentHashMap[Path, FileZipArchive]
+  private def fza(path: Path): FileZipArchive = {
+    val valueOrNull = fzaCache.get(path)
+    if (valueOrNull == null) {
+      val fza0 = new FileZipArchive(path.toFile)
+      val previousOrNull = fzaCache.putIfAbsent(path, fza0)
+      if (previousOrNull == null) fza0
+      else previousOrNull
+    } else
+      valueOrNull
+  }
+}
 
 class MetalsGlobal(
+    javaHome: Path,
     val userLogger: java.util.function.Consumer[String],
     settings: Settings,
     reporter: Reporter,
@@ -130,6 +158,134 @@ class MetalsGlobal(
       }
     userLogger.accept("Done parsing")
     res
+  }
+
+  override lazy val classPath: ClassPath = {
+    import MetalsGlobal.fza
+
+    val modFiles = settings.classpath.value
+      .split(File.pathSeparator)
+      .filter(_.endsWith(".jmod"))
+      .map(Paths.get(_))
+
+    lazy val modCp: ClassPath = new ClassPath {
+      import java.nio.file._
+
+      lazy val srcZip: Path = {
+        val candidates =
+          List(javaHome.resolve("src.zip"), javaHome.resolve("lib/src.zip"))
+        candidates.iterator
+          .filter(Files.isRegularFile(_))
+          .take(1)
+          .headOption
+          .getOrElse {
+            sys.error(s"No src.zip found in $candidates")
+          }
+      }
+
+      def cpIterator(): Iterator[Path] =
+        modFiles.iterator
+
+      def asClassPathStrings: Seq[String] =
+        cpIterator()
+          .map(_.toString)
+          .toVector
+      def asSourcePathString: String =
+        srcZip.toString
+      def asURLs: Seq[URL] =
+        cpIterator()
+          .map(_.toUri.toURL)
+          .toVector
+
+      def findClassFile(className: String): Option[AbstractFile] = {
+        val entryName = "classes/" + className.replace(".", "/") + ".class"
+        val idx = entryName.lastIndexOf('/')
+        val dirName = entryName.substring(0, idx + 1)
+        val fileName = entryName.substring(idx + 1)
+        cpIterator()
+          .flatMap { f =>
+            val fza0 = fza(f)
+            val dirEnt = fza0.allDirs.get(dirName)
+            if (dirEnt == null) Iterator.empty
+            else dirEnt.entries.get(fileName).iterator
+          }
+          .take(1)
+          .toList
+          .headOption
+      }
+
+      def hasPackage(pkg: PackageName): Boolean = {
+        val dirName =
+          ("classes" +: pkg.dottedString.split('.').filter(_.nonEmpty))
+            .mkString("", "/", "/")
+        cpIterator().exists(f => fza(f).allDirs.get(dirName) != null)
+      }
+
+      def list(inPackage: PackageName): ClassPathEntries =
+        ClassPathEntries(
+          packages(inPackage),
+          classes(inPackage) ++ sources(inPackage)
+        )
+
+      def packages(inPackage: PackageName): Seq[PackageEntry] = {
+        val dirName =
+          ("classes" +: inPackage.dottedString.split('.').filter(_.nonEmpty))
+            .mkString("", "/", "/")
+        val prefix =
+          if (inPackage.dottedString.isEmpty) ""
+          else inPackage.dottedString + "."
+        cpIterator()
+          .flatMap { f =>
+            val fza0 = fza(f)
+            val dirEnt = fza0.allDirs.get(dirName)
+            if (dirEnt == null) Iterator.empty
+            else
+              dirEnt.entries.valuesIterator
+                .filter(_.isDirectory)
+                .map(e =>
+                  metals.AggregateClassPath.packageEntry(prefix + e.name)
+                )
+          }
+          .toVector
+          .distinct
+      }
+      def classes(inPackage: PackageName): Seq[ClassFileEntry] = {
+        val dirName =
+          ("classes" +: inPackage.dottedString.split('.').filter(_.nonEmpty))
+            .mkString("", "/", "/")
+        cpIterator()
+          .flatMap { f =>
+            val fza0 = fza(f)
+            val dirEnt = fza0.allDirs.get(dirName)
+            if (dirEnt == null) Iterator.empty
+            else
+              dirEnt.entries.valuesIterator
+                .filter(!_.isDirectory)
+                .filter(_.name.endsWith(".class"))
+                .map(e => metals.AggregateClassPath.classFileEntry(e))
+          }
+          .toVector
+          .distinct
+      }
+      def sources(inPackage: PackageName): Seq[SourceFileEntry] = {
+        val dirName =
+          ("classes" +: inPackage.dottedString.split('.').filter(_.nonEmpty))
+            .mkString("", "/", "/")
+        val fza0 = fza(srcZip)
+        val dirEnt = fza0.allDirs.get(dirName)
+        if (dirEnt == null) Nil
+        else
+          dirEnt.entries.valuesIterator
+            .filter(e => e.name.endsWith(".scala") || e.name.endsWith(".java"))
+            .map(e => metals.AggregateClassPath.sourceFileEntry(e))
+            .toVector
+            .distinct
+      }
+    }
+
+    new scala.tools.nsc.classpath.metals.AggregateClassPath(
+      Seq(modCp, super.classPath)
+    )
   }
 
   val logger: Logger = Logger.getLogger(classOf[MetalsGlobal].getName)
