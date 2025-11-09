@@ -29,7 +29,7 @@ object V {
 
   val bloopConfig = "2.3.3"
 
-  val bsp = "2.2.0-M2"
+  val bsp = "2.2.0-M3"
 
   val coursier = "2.1.25-M19"
   // changing coursier interfaces version may be not binary compatible.
