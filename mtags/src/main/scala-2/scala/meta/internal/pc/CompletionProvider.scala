@@ -567,6 +567,43 @@ class CompletionProvider(
           )
       }
     }
+    def withoutBrokenSymbols(
+        completions: CompletionResult
+    ): CompletionResult =
+      completions match {
+        case m: CompletionResult.ScopeMembers =>
+          m.copy(results = m.results.filter { m =>
+            try {
+              m.sym.dealiased.info
+              m.sym.info
+              m.sym.exists
+            } catch {
+              case e: TypeError =>
+                scribe.warn(
+                  "Ignoring completion symbol that throws on call to exists",
+                  e
+                )
+                false
+            }
+          })
+        case m: CompletionResult.TypeMembers =>
+          m.copy(results = m.results.filter { m =>
+            try {
+              m.sym.dealiased.info
+              m.sym.info
+              m.sym.exists
+            } catch {
+              case e: TypeError =>
+                scribe.warn(
+                  "Ignoring completion symbol that throws on call to exists",
+                  e
+                )
+                false
+            }
+          })
+        case _ =>
+          completions
+      }
     def matchResults(
         completions: CompletionResult
     ): (CompletionListKind, String, List[Member]) = {
@@ -592,11 +629,11 @@ class CompletionProvider(
     try {
       val firstPass =
         SimpleTimer.timedThunk("completionsAt", thresholdMillis = 1000) {
-          completionsAt(pos) match {
+          withoutBrokenSymbols(completionsAt(pos) match {
             case CompletionResult.NoResults =>
               new DynamicFallbackCompletions(pos).print()
             case r => r
-          }
+          })
         }
       params.checkCanceled()
       val noRestore: () => Unit = () => ()
@@ -606,11 +643,12 @@ class CompletionProvider(
           if (matched1.nonEmpty) None
           else
             retryWithRecoveredQualifier(pos).flatMap {
-              case (secondPass, restore) =>
+              case (secondPass0, restore) =>
                 // The qualifier is still grafted here; restore it on every
                 // path that does not hand `restore` over to the `finally`
                 // below.
                 try {
+                  val secondPass = withoutBrokenSymbols(secondPass0)
                   val (kind2, query2, matched2) = matchResults(secondPass)
                   if (matched2.isEmpty) {
                     restore()
