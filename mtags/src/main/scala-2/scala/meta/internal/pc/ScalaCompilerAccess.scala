@@ -69,7 +69,16 @@ class ScalaCompilerAccess(
   def latestException(): Option[(Option[String], Throwable)] =
     latestExceptionOpt
 
-  def newReporter = new MetalsReporter(new Settings())
+  def newReporter: MetalsReporter = new MetalsReporter(new Settings()) {
+    override def doReport(
+        pos: scala.reflect.internal.util.Position,
+        msg: String,
+        severity: Severity
+    ): Unit = {
+      System.err.println(s"$severity [$pos] $msg")
+      super.doReport(pos, msg, severity)
+    }
+  }
 
   protected def handleSharedCompilerException(
       t: Throwable
