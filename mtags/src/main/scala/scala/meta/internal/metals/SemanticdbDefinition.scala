@@ -43,21 +43,21 @@ case class SemanticdbDefinition(
 object SemanticdbDefinition {
   def foreach(
       input: Input.VirtualFile,
-      dialect: Dialect,
+      dialectOpt: Option[Dialect],
       includeMembers: Boolean
   )(
       fn: SemanticdbDefinition => Unit
   )(implicit rc: ReportContext): Unit =
     foreachWithReturnMtags(
       input,
-      dialect,
+      dialectOpt,
       includeMembers,
       collectIdentifiers = false
     )(fn)
 
   def foreachWithReturnMtags(
       input: Input.VirtualFile,
-      dialect: Dialect,
+      dialectOpt: Option[Dialect],
       includeMembers: Boolean,
       collectIdentifiers: Boolean
   )(
@@ -65,27 +65,29 @@ object SemanticdbDefinition {
   )(implicit rc: ReportContext): Option[MtagsIndexer] = {
     input.toLanguage match {
       case Language.SCALA =>
-        val mtags = new ScalaToplevelMtags(
-          input,
-          includeInnerClasses = true,
-          includeMembers = includeMembers,
-          dialect,
-          collectIdentifiers = collectIdentifiers
-        ) {
-          override def visitOccurrence(
-              occ: SymbolOccurrence,
-              info: SymbolInformation,
-              owner: String
-          ): Unit = {
-            fn(SemanticdbDefinition(info, occ, owner))
+        dialectOpt.map { dialect =>
+          val mtags = new ScalaToplevelMtags(
+            input,
+            includeInnerClasses = true,
+            includeMembers = includeMembers,
+            dialect,
+            collectIdentifiers = collectIdentifiers
+          ) {
+            override def visitOccurrence(
+                occ: SymbolOccurrence,
+                info: SymbolInformation,
+                owner: String
+            ): Unit = {
+              fn(SemanticdbDefinition(info, occ, owner))
+            }
           }
+          try mtags.indexRoot()
+          catch {
+            case _: TokenizeException | _: UnexpectedInputEndException =>
+              () // ignore because we don't need to index untokenizable files.
+          }
+          mtags
         }
-        try mtags.indexRoot()
-        catch {
-          case _: TokenizeException | _: UnexpectedInputEndException =>
-            () // ignore because we don't need to index untokenizable files.
-        }
-        Some(mtags)
       case Language.JAVA =>
         val mtags = new JavaMtags(input, includeMembers) {
           override def visitOccurrence(
