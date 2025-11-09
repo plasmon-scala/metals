@@ -67,7 +67,7 @@ class ClasspathDefinitionIndex(mtags: () => Mtags, dialect: Dialect) {
         querySymbol = symbol,
         definitionSymbol = Symbol(occ.symbol),
         SourcePath(source.toURI.toString),
-        Scala213,
+        Some(Scala213),
         occ.range,
         kind,
         props

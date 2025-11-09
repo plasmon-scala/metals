@@ -45,7 +45,7 @@ object SemanticdbDefinition {
   def foreach(
       mtags: Mtags,
       input: Input.VirtualFile,
-      dialect: Dialect,
+      dialectOpt: Option[Dialect],
       includeMembers: Boolean
   )(
       fn: SemanticdbDefinition => Unit
@@ -53,7 +53,7 @@ object SemanticdbDefinition {
     foreachWithReturnMtags(
       mtags,
       input,
-      dialect,
+      dialectOpt,
       includeMembers,
       collectIdentifiers = false
     )(fn)
@@ -61,7 +61,7 @@ object SemanticdbDefinition {
   def foreachWithReturnMtags(
       mtags: Mtags,
       input: Input.VirtualFile,
-      dialect: Dialect,
+      dialectOpt: Option[Dialect],
       includeMembers: Boolean,
       collectIdentifiers: Boolean
   )(
@@ -69,34 +69,36 @@ object SemanticdbDefinition {
   )(implicit rc: ReportContext): Option[MtagsIndexer] = {
     input.toJLanguage match {
       case Semanticdb.Language.SCALA =>
-        val indexer = new ScalaToplevelMtags(
-          input,
-          includeInnerClasses = true,
-          includeMembers = includeMembers,
-          dialect,
-          collectIdentifiers = collectIdentifiers
-        ) {
-          override def visitFuzzyReferenceOccurrence(
-              occ: SymbolOccurrence
-          ): Unit = {
-            if (collectIdentifiers) {
-              fn(SemanticdbDefinition(SymbolInformation(), occ, owner))
+        dialectOpt.map { dialect =>
+          val indexer = new ScalaToplevelMtags(
+            input,
+            includeInnerClasses = true,
+            includeMembers = includeMembers,
+            dialect,
+            collectIdentifiers = collectIdentifiers
+          ) {
+            override def visitFuzzyReferenceOccurrence(
+                occ: SymbolOccurrence
+            ): Unit = {
+              if (collectIdentifiers) {
+                fn(SemanticdbDefinition(SymbolInformation(), occ, owner))
+              }
+            }
+            override def visitOccurrence(
+                occ: SymbolOccurrence,
+                info: SymbolInformation,
+                owner: String
+            ): Unit = {
+              fn(SemanticdbDefinition(info, occ, owner))
             }
           }
-          override def visitOccurrence(
-              occ: SymbolOccurrence,
-              info: SymbolInformation,
-              owner: String
-          ): Unit = {
-            fn(SemanticdbDefinition(info, occ, owner))
+          try indexer.indexRoot()
+          catch {
+            case _: TokenizeException | _: UnexpectedInputEndException =>
+              () // ignore because we don't need to index untokenizable files.
           }
+          indexer
         }
-        try indexer.indexRoot()
-        catch {
-          case _: TokenizeException | _: UnexpectedInputEndException =>
-            () // ignore because we don't need to index untokenizable files.
-        }
-        Some(indexer)
       case Semanticdb.Language.JAVA =>
         val indexer = mtags.config.javaInstanceWithOccurrenceVisitor(
           input,

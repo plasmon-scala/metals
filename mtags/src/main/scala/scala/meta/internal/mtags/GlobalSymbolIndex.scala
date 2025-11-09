@@ -74,7 +74,7 @@ trait GlobalSymbolIndex {
   def addSourceJar(
       module: GlobalSymbolIndex.Module,
       jar: AbsolutePath,
-      dialect: Dialect,
+      dialectOpt: Option[Dialect],
       reindex: Boolean = false
   )(implicit ctx: SourcePath.Context): List[IndexingResult]
 
@@ -96,7 +96,7 @@ trait GlobalSymbolIndex {
     SourcePath.withContext { implicit ctx =>
       for {
         sources <- dependencyModule.sources.toList
-        result <- addSourceJar(module, sources, dialect)
+        result <- addSourceJar(module, sources, Some(dialect))
       } yield result
     }
   }
@@ -107,7 +107,7 @@ trait GlobalSymbolIndex {
   def addSourceDirectory(
       module: GlobalSymbolIndex.Module,
       dir: AbsolutePath,
-      dialect: Dialect
+      dialectOpt: Option[Dialect]
   ): List[IndexingResult]
 
   /**
@@ -118,7 +118,7 @@ trait GlobalSymbolIndex {
    */
   def findFileForToplevel(
       topLevelSymbol: mtags.Symbol
-  )(implicit ctx: SourcePath.Context): List[(SourcePath, Dialect)]
+  )(implicit ctx: SourcePath.Context): List[(SourcePath, Option[Dialect])]
 
 }
 
@@ -149,7 +149,7 @@ case class SymbolDefinition(
     querySymbol: Symbol,
     definitionSymbol: Symbol,
     path: SourcePath,
-    dialect: Dialect,
+    dialectOpt: Option[Dialect],
     range: Option[s.Range],
     kind: Option[s.SymbolInformation.Kind],
     properties: Int

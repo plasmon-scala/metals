@@ -32,8 +32,11 @@ final class Mtags(val config: MtagsConfig = MtagsConfig.default)(implicit
     index(path, dialect)
   }
 
-  def allSymbols(input: Input.VirtualFile, dialect: Dialect): TextDocument =
-    index(input.toJLanguage, input, dialect)
+  def allSymbols(
+      input: Input.VirtualFile,
+      dialectOpt: Option[Dialect]
+  ): TextDocument =
+    index(input.toJLanguage, input, dialectOpt)
 
   def toplevels(
       path: AbsolutePath,
@@ -72,7 +75,7 @@ final class Mtags(val config: MtagsConfig = MtagsConfig.default)(implicit
 
   def extendedIndexing(
       input: Input.VirtualFile,
-      dialect: Dialect = dialects.Scala213,
+      dialectOpt: Option[Dialect] = None,
       includeMembers: Boolean = false
   ): (
       TextDocument,
@@ -80,7 +83,11 @@ final class Mtags(val config: MtagsConfig = MtagsConfig.default)(implicit
       MtagsIndexer.AllToplevelMembers
   ) = {
     val language = input.toJLanguage
-    if (language.isJava || language.isScala) {
+    // Scala sources can't be indexed without a dialect (buckets of Java-only modules have none)
+    lazy val dialect = dialectOpt.getOrElse(dialects.Scala213)
+    if (language.isScala && dialectOpt.isEmpty) {
+      (TextDocument(), Nil, Nil)
+    } else if (language.isJava || language.isScala) {
       val indexer =
         if (language.isJava)
           if (includeMembers)
@@ -156,15 +163,18 @@ final class Mtags(val config: MtagsConfig = MtagsConfig.default)(implicit
       path: AbsolutePath,
       dialect: Dialect
   ): TextDocument =
-    index(path.toJLanguage, path.toInput, dialect)
+    index(path.toJLanguage, path.toInput, Some(dialect))
 
   def index(
       language: Semanticdb.Language,
       input: Input.VirtualFile,
-      dialect: Dialect
+      dialectOpt: Option[Dialect]
   ): TextDocument = {
     addLines(language, input.text)
-    val result = index(input, dialect)
+    val result = dialectOpt match {
+      case None if language == Semanticdb.Language.SCALA => TextDocument()
+      case _ => index(input, dialectOpt.getOrElse(dialects.Scala213))
+    }
     Mtags.stdLibPatches
       .patchDocument(
         input.path,
@@ -265,12 +275,12 @@ final class Mtags(val config: MtagsConfig = MtagsConfig.default)(implicit
 object Mtags {
   lazy val testingSingleton: Mtags = new Mtags()(EmptyReportContext)
 
-  def index(path: SourcePath, dialect: Dialect)(implicit
+  def index(path: SourcePath, dialectOpt: Option[Dialect])(implicit
       rc: ReportContext,
       ctx: SourcePath.Context
   ): TextDocument = {
     val input = path.toInput
-    new Mtags().index(input.toJLanguage, input, dialect)
+    new Mtags().index(input.toJLanguage, input, dialectOpt)
   }
 
   /**
