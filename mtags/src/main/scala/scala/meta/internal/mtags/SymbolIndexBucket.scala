@@ -38,7 +38,7 @@ class SymbolIndexBucket(
     val sourceJars: OpenClassLoader,
     toIndexSource: AbsolutePath => AbsolutePath = identity,
     mtags: Mtags,
-    dialect: Dialect,
+    dialectOpt: Option[Dialect],
     onError: PartialFunction[Throwable, Unit],
     javaHome: Path,
     javaOnly: Boolean,
@@ -52,15 +52,18 @@ class SymbolIndexBucket(
 
   var logger: java.util.function.Consumer[String] = null
 
-  def duplicate(dialect: Dialect, javaOnly: Boolean): SymbolIndexBucket = {
-    assert(this.javaOnly || this.dialect == dialect)
+  def duplicate(
+      dialectOpt: Option[Dialect],
+      javaOnly: Boolean
+  ): SymbolIndexBucket = {
+    assert(this.javaOnly || this.dialectOpt == dialectOpt)
     new SymbolIndexBucket(
       toplevels.duplicate(),
       definitions.duplicate(),
       sourceJars.duplicate(),
       toIndexSource,
       mtags,
-      dialect,
+      dialectOpt,
       onError,
       javaHome,
       javaOnly,
@@ -269,7 +272,7 @@ class SymbolIndexBucket(
   ): IndexingResult = {
     val source = SourcePath(input.path)
     val (doc, overrides, toplevelMembers) =
-      mtags.extendedIndexing(input, dialect)
+      mtags.extendedIndexing(input, dialectOpt)
     val sourceTopLevels =
       doc.occurrences.iterator
         .filterNot(_.symbol.isPackage)
@@ -324,14 +327,14 @@ class SymbolIndexBucket(
 
   def findFileForToplevel(
       topLevelSymbol: Symbol
-  )(implicit ctx: SourcePath.Context): List[(SourcePath, Dialect)] = {
+  )(implicit ctx: SourcePath.Context): List[(SourcePath, Option[Dialect])] = {
     toplevels
       .get(topLevelSymbol.toString())
       .map(_.toList.map(_._1))
       .orElse(loadFromSourceJars(trivialPaths(topLevelSymbol)).map(_.map(_._2)))
       .orElse(loadFromSourceJars(modulePaths(topLevelSymbol)).map(_.map(_._2)))
       .getOrElse(Nil)
-      .map(x => (x, dialect))
+      .map(x => (x, dialectOpt))
   }
 
   def query(symbol: Symbol): List[SymbolDefinition] =
@@ -404,7 +407,7 @@ class SymbolIndexBucket(
               querySymbol = querySymbol,
               definitionSymbol = symbol,
               path = location.path,
-              dialect = dialect,
+              dialectOpt = dialectOpt,
               range = location.range,
               kind = None,
               properties = 0
@@ -465,7 +468,7 @@ class SymbolIndexBucket(
       input: Input.VirtualFile
   )(implicit ctx: SourcePath.Context): s.TextDocument = {
     val toIndexInput0 = toIndexInput(input)
-    mtags.allSymbols(toIndexInput0, dialect)
+    mtags.allSymbols(toIndexInput0, dialectOpt)
   }
 
   private def extension(filename: String): String = {
@@ -577,7 +580,7 @@ class SymbolIndexBucket(
 object SymbolIndexBucket {
 
   def empty(
-      dialect: Dialect,
+      dialectOpt: Option[Dialect],
       mtags: Mtags,
       sourceJars: OpenClassLoader,
       toIndexSource: AbsolutePath => AbsolutePath,
@@ -597,7 +600,7 @@ object SymbolIndexBucket {
       sourceJars,
       toIndexSource,
       mtags,
-      dialect,
+      dialectOpt,
       onError,
       javaHome,
       javaOnly,
