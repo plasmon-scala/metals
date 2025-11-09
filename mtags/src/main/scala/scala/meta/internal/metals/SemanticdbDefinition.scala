@@ -1,5 +1,7 @@
 package scala.meta.internal.metals
 
+import java.util.function.Consumer
+
 import scala.util.control.NonFatal
 
 import scala.meta.Dialect
@@ -46,7 +48,8 @@ object SemanticdbDefinition {
       mtags: Mtags,
       input: Input.VirtualFile,
       dialectOpt: Option[Dialect],
-      includeMembers: Boolean
+      includeMembers: Boolean,
+      logger: Consumer[String] = null
   )(
       fn: SemanticdbDefinition => Unit
   )(implicit rc: ReportContext): Unit =
@@ -55,7 +58,8 @@ object SemanticdbDefinition {
       input,
       dialectOpt,
       includeMembers,
-      collectIdentifiers = false
+      collectIdentifiers = false,
+      logger = logger
     )(fn)
 
   def foreachWithReturnMtags(
@@ -63,7 +67,8 @@ object SemanticdbDefinition {
       input: Input.VirtualFile,
       dialectOpt: Option[Dialect],
       includeMembers: Boolean,
-      collectIdentifiers: Boolean
+      collectIdentifiers: Boolean,
+      logger: Consumer[String] = null
   )(
       fn: SemanticdbDefinition => Unit
   )(implicit rc: ReportContext): Option[MtagsIndexer] = {
@@ -75,7 +80,8 @@ object SemanticdbDefinition {
             includeInnerClasses = true,
             includeMembers = includeMembers,
             dialect,
-            collectIdentifiers = collectIdentifiers
+            collectIdentifiers = collectIdentifiers,
+            logger = logger
           ) {
             override def visitFuzzyReferenceOccurrence(
                 occ: SymbolOccurrence
