@@ -333,6 +333,17 @@ trait ScalametaCommonEnrichments extends CommonMtagsEnrichments {
     def toLanguage: Language =
       filenameToLanguage(path.uri)
 
+    def isScalaScript: Boolean =
+      path match {
+        case p: SourcePath.Standard => p.path.toString.isScalaScript
+        case _: SourcePath.ZipEntry => false
+      }
+    def isMill: Boolean =
+      path match {
+        case p: SourcePath.Standard => p.path.toString.isMill
+        case _: SourcePath.ZipEntry => false
+      }
+
     def readTextOpt(implicit ctx: SourcePath.Context): Option[String] = {
       if (path.exists()) {
         Option(path.content())
