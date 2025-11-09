@@ -50,7 +50,8 @@ public interface SymbolSearch {
      */
     Result search(String query,
                   String buildTargetIdentifier,
-                  SymbolSearchVisitor visitor);
+                  SymbolSearchVisitor visitor,
+                  SourcePathContext ctx);
     Result searchMethods(String query,
                   String buildTargetIdentifier,
                   SymbolSearchVisitor visitor);

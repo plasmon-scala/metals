@@ -66,8 +66,6 @@ final class OpenClassLoader {
       }
   private def resolve(uri: String): Option[Path] =
     resolve0(uri).take(1).toList.headOption
-  def resolveAll(uri: String): List[Path] =
-    resolve0(uri).toList
 
   def resolve(relpath: Path): Option[Path] = {
     val uri = relpath.toURI(isDirectory = false).toString
