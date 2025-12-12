@@ -175,7 +175,8 @@ object V {
   def deprecatedScala2Versions = Nil
 
   def nonDeprecatedScala2Versions = Seq(
-    scala213
+    scala213,
+    "2.13.16"
   )
 
   def minimumSupportedSbtVersion = {
