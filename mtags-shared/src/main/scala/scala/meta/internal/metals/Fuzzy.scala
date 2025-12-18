@@ -76,6 +76,18 @@ class Fuzzy {
     genericMatches(query, symbol, skipNames, matcher)
   }
 
+  def matches(
+      query: CharSequence,
+      symbol: CharSequence,
+      skipNames: Int
+  ): Boolean =
+    matches(
+      query,
+      symbol,
+      skipNames,
+      forgivingFirstChar = false
+    )
+
   private def genericMatches(
       query: CharSequence,
       symbol: CharSequence,
