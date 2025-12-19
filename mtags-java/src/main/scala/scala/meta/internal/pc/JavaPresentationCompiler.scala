@@ -37,8 +37,10 @@ import org.eclipse.lsp4j.SignatureHelp
 import org.eclipse.lsp4j.TextEdit
 import scala.meta.internal.mtags.SourcePath
 import scala.meta.pc.ContentType
+import javax.tools.JavaFileManager
 
 case class JavaPresentationCompiler(
+    javaFileManager: () => JavaFileManager,
     logger: java.util.function.Consumer[String],
     moduleString: String,
     classpath: Seq[Path] = Nil,
@@ -56,7 +58,14 @@ case class JavaPresentationCompiler(
     logger.accept("Class path:")
     for (p <- classpath)
       logger.accept(s"  $p")
-    new JavaMetalsGlobal(moduleString, search, config, classpath, logger)
+    new JavaMetalsGlobal(
+      moduleString,
+      javaFileManager(),
+      search,
+      config,
+      classpath,
+      logger
+    )
   }
 
   override def complete(

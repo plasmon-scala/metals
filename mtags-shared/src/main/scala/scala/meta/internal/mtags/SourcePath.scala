@@ -83,6 +83,12 @@ object SourcePath {
 
   final class Context extends AutoCloseable { ctx =>
     private val map = new ConcurrentHashMap[Path, ZipFile]
+    def reset(): Unit =
+      for ((k, v) <- map.asScala.toVector) {
+        val removed = map.remove(k, v)
+        if (removed)
+          v.close()
+      }
     def get(path: Path): ZipFile =
       Option(map.get(path)) match {
         case Some(zf) => zf
