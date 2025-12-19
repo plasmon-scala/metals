@@ -20,7 +20,6 @@ import scala.compat.java8.FutureConverters
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.Future
-import scala.reflect.internal.FatalError
 import scala.reflect.io.VirtualDirectory
 import scala.tools.nsc.ParsedLogicalPackage
 import scala.tools.nsc.Settings
@@ -1102,48 +1101,31 @@ class ScalaPresentationCompiler(
     userLogger.accept("Class path:")
     for (file <- this.classpath)
       userLogger.accept(s"  $file")
-    try {
-      // settings are needed during the constructor of interactive.Global
-      // and the reporter doesn't have a reference to global yet
-      val reporter = new MetalsReporter(settings) {
-        override def doReport(
-            pos: scala.reflect.internal.util.Position,
-            msg: String,
-            severity: Severity
-        ): Unit = {
-          userLogger.accept(s"$severity [$pos] $msg")
-          super.doReport(pos, msg, severity)
-        }
+    // settings are needed during the constructor of interactive.Global
+    // and the reporter doesn't have a reference to global yet
+    val reporter = new MetalsReporter(settings) {
+      override def doReport(
+          pos: scala.reflect.internal.util.Position,
+          msg: String,
+          severity: Severity
+      ): Unit = {
+        userLogger.accept(s"$severity [$pos] $msg")
+        super.doReport(pos, msg, severity)
       }
-      val mg = new MetalsGlobal(
-        userLogger,
-        settings,
-        reporter,
-        search,
-        buildTargetIdentifier,
-        config,
-        folderPath,
-        completionItemPriority,
-        rootSrcPackage
-      )
-      reporter._metalsGlobal = mg
-      mg
-    } catch {
-      // Match Error from https://github.com/scalameta/metals/issues/7844
-      case e @ (_: FatalError | _: MatchError)
-          if scalaVersion.startsWith("2.") && !withClearedCaches =>
-        val cleared = JrtClasspathCompat.clearJrtClassPathCaches(logger)
-        if (cleared) {
-          userLogger.accept(
-            s"Cleared JrtClassPath caches, to try and fix `${e.getMessage()}`"
-          )
-          newCompiler(withClearedCaches = true)
-        } else {
-          throw e
-        }
-      case e: FatalError =>
-        throw e
     }
+    val mg = new MetalsGlobal(
+      userLogger,
+      settings,
+      reporter,
+      search,
+      buildTargetIdentifier,
+      config,
+      folderPath,
+      completionItemPriority,
+      rootSrcPackage
+    )
+    reporter._metalsGlobal = mg
+    mg
   }
 
   // ================
