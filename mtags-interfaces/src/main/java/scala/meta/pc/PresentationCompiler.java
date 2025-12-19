@@ -336,7 +336,7 @@ public abstract class PresentationCompiler {
 	 *                              org.scalamacros:paradise, kind-projector and
 	 *                              better-monadic-for.
 	 */
-	public abstract PresentationCompiler newInstance(String buildTargetIdentifier, List<Path> classpath,
+	public abstract PresentationCompiler newInstance(String moduleString, List<Path> classpath,
 			List<String> options);
 
 	// =============================

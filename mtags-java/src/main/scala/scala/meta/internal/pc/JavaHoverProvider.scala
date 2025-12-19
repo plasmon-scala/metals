@@ -32,7 +32,8 @@ class JavaHoverProvider(
 ) {
 
   def hover(): Option[HoverSignature] = params match {
-    case range: RangeParams => range.trimWhitespaceInRange.flatMap(hoverOffset)
+    case range: RangeParams =>
+      range.trimWhitespaceInRange.flatMap(hoverOffset(_))
     case _ if isWhitespace => None
     case _ => hoverOffset(params)
   }
@@ -43,7 +44,9 @@ class JavaHoverProvider(
     params.text().charAt(params.offset()).isWhitespace
   }
 
-  def hoverOffset(params: OffsetParams): Option[HoverSignature] = {
+  def hoverOffset(
+      params: OffsetParams
+  ): Option[HoverSignature] = {
     val task: JavacTask =
       compiler.compilationTask(params.text(), params.uri())
     val scanner = JavaMetalsGlobal.scanner(task)

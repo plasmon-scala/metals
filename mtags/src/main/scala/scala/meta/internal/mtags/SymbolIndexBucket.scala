@@ -186,10 +186,26 @@ class SymbolIndexBucket(
     mtags: Mtags,
     dialect: Dialect,
     onError: PartialFunction[Throwable, Unit],
-    javaHome: Path
+    javaHome: Path,
+    javaOnly: Boolean
 ) {
 
   private val logger = Logger.getLogger(classOf[SymbolIndexBucket].getName)
+
+  def duplicate(dialect: Dialect, javaOnly: Boolean): SymbolIndexBucket = {
+    assert(this.javaOnly || this.dialect == dialect)
+    new SymbolIndexBucket(
+      toplevels.duplicate(),
+      definitions.duplicate(),
+      sourceJars.duplicate(),
+      toIndexSource,
+      mtags,
+      dialect,
+      onError,
+      javaHome,
+      javaOnly
+    )
+  }
 
   def close(): Unit = () // sourceJars.close()
 
@@ -647,7 +663,8 @@ object SymbolIndexBucket {
       sourceJars: OpenClassLoader,
       toIndexSource: AbsolutePath => AbsolutePath,
       onError: PartialFunction[Throwable, Unit],
-      javaHome: Path
+      javaHome: Path,
+      javaOnly: Boolean
   ): SymbolIndexBucket =
     new SymbolIndexBucket(
       AtomicTrieMap.empty,
@@ -657,7 +674,8 @@ object SymbolIndexBucket {
       mtags,
       dialect,
       onError,
-      javaHome
+      javaHome,
+      javaOnly
     )
 
 }
