@@ -162,7 +162,7 @@ class MetalsGlobal(
     res
   }
 
-  override lazy val classPath: ClassPath = {
+  private def actualClassPath(superClassPath: ClassPath): ClassPath = {
     import MetalsGlobal.fza
 
     val modFiles = settings.classpath.value
@@ -286,7 +286,7 @@ class MetalsGlobal(
     }
 
     new scala.tools.nsc.classpath.metals.AggregateClassPath(
-      Seq(modCp, super.classPath)
+      Seq(modCp, superClassPath)
     )
   }
 
@@ -379,6 +379,7 @@ class MetalsGlobal(
   override lazy val platform: ThisPlatform = new GlobalPlatform
     with MetalsJavaPlatform {
     val rootPackage: LogicalPackage = rootSrcPackage
+    override lazy val classPath: ClassPath = actualClassPath(super.classPath)
   }
 
   def isDocs: Boolean = System.getProperty("metals.signature-help") != "no-docs"

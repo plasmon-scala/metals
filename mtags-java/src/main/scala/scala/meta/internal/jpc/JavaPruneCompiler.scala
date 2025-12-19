@@ -109,8 +109,23 @@ class JavaPruneCompiler(
     // -classpath makes javac fall back to the host JVM's own
     // java.class.path, leaking our own runtime dependencies into the
     // compiled target's classpath.
+    // An rt.jar on the class path means we're targeting a Java 8 JDK, whose
+    // classes are passed via -bootclasspath
+    val (bootClassPath, userClassPath) =
+      classpath.partition(_.getFileName.toString == "rt.jar")
+    val hasVersionOption = processedExtraOptions.exists { opt =>
+      JavaPruneCompiler.versionOptions(opt) || opt.startsWith("--release=")
+    }
+    if (!hasVersionOption) {
+      val javaVersion = if (bootClassPath.isEmpty) "17" else "1.8"
+      options ++= List("--source", javaVersion, "--target", javaVersion)
+    }
+    if (bootClassPath.nonEmpty) {
+      options += "-bootclasspath"
+      options += bootClassPath.mkString(File.pathSeparator)
+    }
     options += "-classpath"
-    options += classpath.mkString(File.pathSeparator)
+    options += userClassPath.mkString(File.pathSeparator)
     options ++= processedExtraOptions
     // Add --patch-module option if we're compiling sources from the JDK.
     for {
@@ -394,4 +409,10 @@ class JavaPruneCompiler(
     options.result()
   }
 
+}
+
+object JavaPruneCompiler {
+  private val versionOptions = Set(
+    "-source", "--source", "-target", "--target", "-release", "--release"
+  )
 }
