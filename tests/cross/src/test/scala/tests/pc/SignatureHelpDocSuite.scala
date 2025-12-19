@@ -158,7 +158,7 @@ class SignatureHelpDocSuite extends BaseSignatureHelpSuite {
        |- `z`: the start value.
        |- `op`: the binary operator.
        |
-       |**Returns:** the result of inserting `op` between consecutive elements of this collection or iterator,
+       |**Returns** the result of inserting `op` between consecutive elements of this collection or iterator,
        |          going left to right with the start value `z` on the left:
        |
        |```
@@ -213,7 +213,7 @@ class SignatureHelpDocSuite extends BaseSignatureHelpSuite {
        |the result class `That` from the current representation type `Repr` and
        |the new element type `B`.
        |
-       |**Returns:** a new general collection resulting from applying the given function
+       |**Returns** a new general collection resulting from applying the given function
        |                 `f` to each element of this general collection and collecting the results.
        |map[B, That](f: Int => B)(implicit bf: CanBuildFrom[List[Int],B,That]): That
        |             ^^^^^^^^^^^
@@ -229,7 +229,7 @@ class SignatureHelpDocSuite extends BaseSignatureHelpSuite {
            |**Parameters**
            |- `f`: the function to apply to each element.
            |
-           |**Returns:** a new collection resulting from applying the given function
+           |**Returns** a new collection resulting from applying the given function
            |               `f` to each element of this collection and collecting the results.
            |map[B](f: Int => B): List[B]
            |       ^^^^^^^^^^^
@@ -266,7 +266,7 @@ class SignatureHelpDocSuite extends BaseSignatureHelpSuite {
        |**Parameters**
        |- `x`: the value
        |
-       |**Returns:** Some(value) if value != null, None if value == null
+       |**Returns** Some(value) if value != null, None if value == null
        |apply[A](x: A): Option[A]
        |         ^^^^
        |  @param x (Int, Int, Int) the value
@@ -442,7 +442,7 @@ class SignatureHelpDocSuite extends BaseSignatureHelpSuite {
        | a new `step`.
        |
        |
-       |**Returns:** a new range with a different step
+       |**Returns** a new range with a different step
        |by(step: Int): Range
        |   ^^^^^^^^^
        |""".stripMargin
