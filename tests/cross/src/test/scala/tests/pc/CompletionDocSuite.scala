@@ -829,7 +829,7 @@ class CompletionDocSuite extends BaseCompletionSuite {
        |- `key`: the key to be inserted
        |- `value`: the value to be associated with `key`
        |
-       |**Returns:** a new immutable tree map with the inserted binding, if it wasn't present in the map
+       |**Returns** a new immutable tree map with the inserted binding, if it wasn't present in the map
        |insert[B1 >: Int](key: Int, value: B1): TreeMap[Int,B1]
        |""".stripMargin,
     includeDocs = true,
@@ -846,7 +846,7 @@ class CompletionDocSuite extends BaseCompletionSuite {
            |- `key`: the key to be inserted
            |- `value`: the value to be associated with `key`
            |
-           |**Returns:** a new immutable tree map with the inserted binding, if it wasn't present in the map
+           |**Returns** a new immutable tree map with the inserted binding, if it wasn't present in the map
            |insert[V1 >: Int](key: Int, value: V1): TreeMap[Int,V1]
            |""".stripMargin,
       "3" -> """|> A new TreeMap with the entry added is returned,
@@ -860,7 +860,7 @@ class CompletionDocSuite extends BaseCompletionSuite {
                 |- `key`: the key to be inserted
                 |- `value`: the value to be associated with `key`
                 |
-                |**Returns:** a new immutable tree map with the inserted binding, if it wasn't present in the map
+                |**Returns** a new immutable tree map with the inserted binding, if it wasn't present in the map
                 |insert[V1 >: Int](key: Int, value: V1): TreeMap[Int, V1]
                 |""".stripMargin
     )
