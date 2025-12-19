@@ -14,7 +14,7 @@ class CompileProvider(val compiler: MetalsGlobal, params: VirtualFileParams) {
       filename = params.uri().toString(),
       cursor = None
     )
-    typeCheck(unit)
+    metalsTypeCheck(unit)
 
     val diagnostics = compiler.reporter
       .asInstanceOf[scala.tools.nsc.reporters.StoreReporter]
