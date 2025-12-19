@@ -44,7 +44,8 @@ import org.eclipse.lsp4j.Position
 class JavaMetalsGlobal(
     val search: SymbolSearch,
     val metalsConfig: PresentationCompilerConfig,
-    val classpath: Seq[Path]
+    val classpath: Seq[Path],
+    val logger: java.util.function.Consumer[String]
 ) {
   var lastVisitedParentTrees: List[TreePath] = Nil
 
@@ -184,7 +185,8 @@ class JavaMetalsGlobal(
             }
           }
         },
-        contentType
+        contentType,
+        logger
       )
       .asScala
   }

@@ -64,7 +64,7 @@ class PcDefinitionProvider(val compiler: MetalsGlobal, params: OffsetParams) {
         params.uri().toString(),
         None
       )
-      typeCheck(unit)
+      metalsTypeCheck(unit)
       val pos = unit.position(params.offset())
       val tree = definitionTypedTreeAt(pos) match {
         case ident: Ident if !ident.namePosition.includes(pos) =>
