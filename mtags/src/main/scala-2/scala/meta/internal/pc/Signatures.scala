@@ -13,6 +13,8 @@ import org.eclipse.{lsp4j => l}
 
 trait Signatures { compiler: MetalsGlobal =>
 
+  import Signatures._
+
   case class ShortName(
       name: Name,
       symbol: Symbol
@@ -352,7 +354,11 @@ trait Signatures { compiler: MetalsGlobal =>
         case Nil => gtpe.paramss
         case tparams => tparams :: gtpe.paramss
       }
-    def defaultMethodSignature(name: String = ""): String = {
+    def defaultMethodSignature(
+        name: String = "",
+        isClassLike: Boolean = false,
+        allowNewLines: Boolean = true
+    ): String = {
       var i = 0
       val paramss = gtpe.typeParams match {
         case Nil => gtpe.paramss
@@ -371,30 +377,45 @@ trait Signatures { compiler: MetalsGlobal =>
         if (labels.isEmpty && params.nonEmpty) Nil
         else labels.iterator :: Nil
       }
-      methodSignature(params, name)
+      methodSignature(
+        params,
+        name,
+        isClassLike = isClassLike,
+        allowNewLines = allowNewLines
+      )
     }
 
     def methodSignature(
         paramLabels: Iterator[Iterator[String]],
         name: String = gsym.nameString,
-        printUnapply: Boolean = true
+        printUnapply: Boolean = true,
+        isClassLike: Boolean = false,
+        allowNewLines: Boolean = true
     ): String = {
+      val printInColumn = allowNewLines && {
+        val paramCount = mparamss.iterator
+          .filter(syms => paramsKind(syms) != Params.TypeParameterKind)
+          .map(_.length)
+          .sum
+        paramCount >= 3
+      }
+
       val params = paramLabels
         .zip(mparamss.iterator)
         .map { case (params, syms) =>
           paramsKind(syms) match {
             // for unapply we don't ever need []
             case Params.TypeParameterKind if printUnapply =>
-              params.mkString("[", ", ", "]")
+              params.mkParamsString("[", ", ", "]", printInColumn)
             case Params.ImplicitKind =>
-              params.mkString("(implicit ", ", ", ")")
+              params.mkParamsString("(implicit ", ", ", ")", printInColumn)
             case _ =>
-              params.mkString("(", ", ", ")")
+              params.mkParamsString("(", ", ", ")", printInColumn)
           }
         }
 
       if (printUnapply)
-        params.mkString(name, "", s": ${returnType}")
+        params.mkString(name, "", if (isClassLike) "" else s": ${returnType}")
       else
         params.mkString
     }
@@ -445,5 +466,23 @@ trait Signatures { compiler: MetalsGlobal =>
         s"$name: ${paramTypeString}$default"
       }
     }
+  }
+}
+
+object Signatures {
+
+  private val nl = System.lineSeparator()
+  private implicit class MkStringStuff(private val it: Iterator[String])
+      extends AnyVal {
+    def mkParamsString(
+        start: String,
+        sep: String,
+        end: String,
+        printInColumn: Boolean
+    ): String =
+      if (printInColumn)
+        it.map("  " + _).mkString(start + nl, sep + nl, nl + end)
+      else
+        it.mkString(start, sep, end)
   }
 }

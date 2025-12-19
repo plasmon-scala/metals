@@ -331,7 +331,7 @@ class CompletionLspSuite extends BaseCompletionLspSuite("completion") {
              |**Parameters**
              |- `prefix`: The list elements to prepend.
              |
-             |**Returns:** a list resulting from the concatenation of the given
+             |**Returns** a list resulting from the concatenation of the given
              |   list `prefix` and this list.
              |""".stripMargin
         ),
