@@ -42,13 +42,15 @@ object EmptySymbolSearch extends SymbolSearch {
 
   override def documentation(
       symbol: String,
-      parents: ParentSymbols
+      parents: ParentSymbols,
+      logger: java.util.function.Consumer[String]
   ): Optional[SymbolDocumentation] =
     Optional.empty()
 
   override def documentation(
       symbol: String,
       parents: ParentSymbols,
-      docstringContentType: ContentType
+      docstringContentType: ContentType,
+      logger: java.util.function.Consumer[String]
   ): Optional[SymbolDocumentation] = Optional.empty()
 }
