@@ -385,6 +385,7 @@ lazy val `mtags-java` = project
 
 lazy val metals = project
   .settings(
+    publish / skip := true,
     sharedSettings,
     Compile / run / fork := true,
     Compile / mainClass := Some("scala.meta.metals.Main"),
