@@ -21,7 +21,7 @@ class WithCompilationUnit(
   }
   val pos: Position = unit.position(offset)
   lazy val text = unit.source.content
-  typeCheck(unit)
+  metalsTypeCheck(unit)
 
   protected lazy val namedArgCache: Map[Position, Tree] = {
     val parsedTree = parseTree(unit.source)
