@@ -49,13 +49,15 @@ class ScalaCompilerWrapper(global: MetalsGlobal)
 class ScalaCompilerAccess(
     config: PresentationCompilerConfig,
     sh: Option[ScheduledExecutorService],
-    newCompiler: () => ScalaCompilerWrapper
+    newCompiler: () => ScalaCompilerWrapper,
+    userLogger: java.util.function.Consumer[String]
 )(implicit ec: ExecutionContextExecutor)
     extends CompilerAccess[StoreReporter, MetalsGlobal](
       config,
       sh,
       newCompiler,
-      shouldResetJobQueue = false
+      shouldResetJobQueue = false,
+      userLogger
     ) {
 
   def newReporter = new StoreReporter

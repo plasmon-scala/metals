@@ -32,7 +32,7 @@ class SemanticdbTextDocumentProvider(
       filename = uri.toString(),
       cursor = None
     )
-    typeCheck(unit)
+    metalsTypeCheck(unit)
 
     import semanticdbOps._
     // This cache is never updated in semanticdb and will contain the old source

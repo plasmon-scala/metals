@@ -1,5 +1,8 @@
 package scala.meta.internal.pc
 
+import java.io.ByteArrayOutputStream
+import java.io.PrintStream
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
@@ -25,7 +28,8 @@ abstract class CompilerAccess[Reporter, Compiler](
     config: PresentationCompilerConfig,
     sh: Option[ScheduledExecutorService],
     newCompiler: () => CompilerWrapper[Reporter, Compiler],
-    shouldResetJobQueue: Boolean
+    shouldResetJobQueue: Boolean,
+    userLogger: java.util.function.Consumer[String]
 )(implicit ec: ExecutionContextExecutor) {
 
   private val logger: Logger =
@@ -174,20 +178,31 @@ abstract class CompilerAccess[Reporter, Compiler](
     } catch {
       case InterruptException() =>
         default
-      case other: Throwable
-          if java.lang.Boolean.getBoolean("plasmon.enable-interactive-retry") =>
-        handleSharedCompilerException(other)
-          .map { message =>
-            retryWithCleanCompiler(
-              thunk,
-              default,
-              message
-            )
-          }
-          .getOrElse {
-            handleError(other)
-            default
-          }
+      case ex: Throwable =>
+        val exStr = {
+          val baos = new ByteArrayOutputStream
+          val ps = new PrintStream(baos, true, StandardCharsets.UTF_8)
+          ex.printStackTrace(ps)
+          new String(baos.toByteArray, StandardCharsets.UTF_8)
+        }
+        userLogger.accept("Caught exception")
+        userLogger.accept(exStr)
+
+        if (java.lang.Boolean.getBoolean("plasmon.enable-interactive-retry"))
+          handleSharedCompilerException(ex)
+            .map { message =>
+              retryWithCleanCompiler(
+                thunk,
+                default,
+                message
+              )
+            }
+            .getOrElse {
+              handleError(ex)
+              default
+            }
+        else
+          default
     }
   }
 
