@@ -74,13 +74,13 @@ object MarkdownGenerator extends ScalaDocPrinter {
   }
 
   protected def wrapParam(param: String): String = s"`$param`"
-  protected def constructor: String = "**Constructor:**"
-  protected def deprecated: String = "**Deprecated:**"
+  protected def constructor: String = "**Constructor**"
+  protected def deprecated: String = "**Deprecated**"
   protected def examples: String = "**Examples**\n"
   override protected def notesTitle: String = "**Notes**\n"
   override protected def typeParamsTitle: String = "**Type Parameters**\n"
   override protected def parametersTitle: String = "**Parameters**\n"
-  protected def returns: String = "**Returns:**"
+  protected def returns: String = "**Returns**"
   override protected def throwsTitle: String = "**Throws**\n"
   override protected def seeTitle: String = "**See**\n"
 
