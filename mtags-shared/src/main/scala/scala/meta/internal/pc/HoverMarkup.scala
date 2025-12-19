@@ -24,13 +24,16 @@ object HoverMarkup {
   ): String = {
     val builder = new StringBuilder()
 
+    var printedScalaStuff = false
+    var printedDocstringStuff = false
+
     def appendCode(title: Option[String], code: String) = {
       title.foreach { title =>
         builder
           .append(if (markdown) "**" else "")
           .append(title)
           .append(if (markdown) "**" else "")
-          .append(":\n")
+          .append("\n")
       }
       builder
         .append(if (markdown) "```scala\n" else "")
@@ -41,13 +44,7 @@ object HoverMarkup {
     if (contextInfo.nonEmpty) {
       appendCode(None, contextInfo.mkString("\n"))
       builder.append("\n\n")
-    }
-    if (forceExpressionType || optSymbolSignature.isEmpty) {
-      appendCode(
-        if (optSymbolSignature.isDefined) Some("Expression type") else None,
-        expressionType
-      )
-      builder.append("\n")
+      printedScalaStuff = true
     }
 
     optSymbolSignature.foreach { symbolSignature =>
@@ -56,12 +53,27 @@ object HoverMarkup {
           if (forceExpressionType) Some("Symbol signature") else None,
           symbolSignature
         )
+        printedScalaStuff = true
       }
     }
-    if (docstring.nonEmpty)
+    if (docstring.nonEmpty) {
+      if (printedScalaStuff)
+        builder.append("\n\n***\n")
       builder
         .append("\n")
         .append(docstring)
+      printedDocstringStuff = true
+    }
+    if (forceExpressionType || optSymbolSignature.isEmpty) {
+      if (printedDocstringStuff || printedScalaStuff)
+        builder.append("\n\n***\n")
+      appendCode(
+        if (optSymbolSignature.isDefined) Some("Expression type") else None,
+        expressionType
+      )
+      builder.append("\n")
+      printedScalaStuff = true
+    }
     builder.toString()
   }
 
@@ -104,21 +116,33 @@ object HoverMarkup {
         .append(if (markdown) "\n```" else "")
     }
 
-    if (forceExpressionType) {
-      addCode(Some("Expression type"), expressionType)
-      builder.append("\n")
-    }
+    var printedJavaStuff = false
+    var printedDocstring = false
 
-    if (symbolSignature.nonEmpty)
+    if (symbolSignature.nonEmpty) {
       addCode(
         if (forceExpressionType) Some("Symbol signature") else None,
         symbolSignature
       )
+      printedJavaStuff = true
+    }
 
-    if (docstring.nonEmpty)
+    if (docstring.nonEmpty) {
+      if (printedJavaStuff)
+        builder.append("\n\n***\n")
       builder
         .append("\n")
         .append(docstring)
+      printedDocstring = true
+    }
+    if (forceExpressionType) {
+      if (printedJavaStuff || printedDocstring)
+        builder.append("\n\n***\n")
+      addCode(Some("Expression type"), expressionType)
+      builder.append("\n")
+      printedJavaStuff = true
+    }
+
     builder.toString()
   }
 
