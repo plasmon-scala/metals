@@ -308,7 +308,7 @@ trait Completions { this: MetalsGlobal =>
     sym match {
       case m: MethodSymbol =>
         new SignaturePrinter(m, history, info, includeDocs = false)
-          .defaultMethodSignature()
+          .defaultMethodSignature(allowNewLines = false)
       case _ =>
         def fullName(s: Symbol): String =
           " " + s.owner.fullNameSyntax
