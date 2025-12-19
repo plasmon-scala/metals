@@ -1,6 +1,7 @@
 package scala.meta.internal.pc
 
 import java.net.URI
+import javax.tools.JavaFileManager
 
 import scala.collection.mutable
 import scala.jdk.CollectionConverters._
@@ -26,9 +27,12 @@ object JavaSourceShortener {
    * Returns the source with all method/constructor/initializer bodies replaced by empty blocks.
    * Returns None if the source does not parse as valid Java.
    */
-  def shortenBodies(source: String): Option[String] = {
+  def shortenBodies(
+      javaFileManager: JavaFileManager,
+      source: String
+  ): Option[String] = {
     Try {
-      val task = JavaMetalsGlobal.baseCompilationTask(source, dummyUri)
+      val task = JavaMetalsGlobal.baseCompilationTask(javaFileManager, source, dummyUri)
       val units = task.parse().asScala.toList
       val unitOpt = units.headOption
       unitOpt.flatMap { unit =>
