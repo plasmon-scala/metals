@@ -101,6 +101,13 @@ class MetalsGlobal(
     with WorkspaceSymbolSearch { compiler =>
   hijackPresentationCompilerThread()
 
+  override lazy val platform: ThisPlatform = {
+    new scala.tools.nsc.backend.JavaPlatform {
+      lazy val global: compiler.type = compiler
+      override lazy val classPath: ClassPath = actualClassPath(super.classPath)
+    }
+  }
+
   private val typeCheckingCache =
     new ConcurrentHashMap[AbstractFile, Array[Char]]
   def metalsTypeCheck(unit: RichCompilationUnit): Unit = {
@@ -154,7 +161,7 @@ class MetalsGlobal(
     res
   }
 
-  override lazy val classPath: ClassPath = {
+  private def actualClassPath(superClassPath: ClassPath): ClassPath = {
     import MetalsGlobal.fza
 
     val modFiles = settings.classpath.value
@@ -278,7 +285,7 @@ class MetalsGlobal(
     }
 
     new scala.tools.nsc.classpath.metals.AggregateClassPath(
-      Seq(modCp, super.classPath)
+      Seq(modCp, superClassPath)
     )
   }
 
