@@ -66,7 +66,7 @@ class SemanticdbTextDocumentProvider(
         "semanticdb:textDocument:typeCheck",
         thresholdMillis = 250
       ) {
-        typeCheck(unit)
+        metalsTypeCheck(unit)
       }
 
       import semanticdbOps._

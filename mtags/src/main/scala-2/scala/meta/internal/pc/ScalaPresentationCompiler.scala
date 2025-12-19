@@ -76,6 +76,9 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
 class ScalaPresentationCompiler(
+    userLoggerSupplier: java.util.function.Supplier[
+      java.util.function.Consumer[String]
+    ],
     var buildTargetIdentifier: String = "",
     var buildTargetName: Option[String] = None,
     var classpath: Seq[Path] = Nil,
@@ -101,6 +104,8 @@ class ScalaPresentationCompiler(
 
   implicit val reportContext: ReportContext =
     optReportContext.getOrElse(new EmptyReportContext())
+
+  private val userLogger = userLoggerSupplier.get()
 
   override def withBuildTargetName(
       buildTargetName: String
@@ -196,6 +201,7 @@ class ScalaPresentationCompiler(
       config,
       sh,
       () => new ScalaCompilerWrapper(newCompiler()),
+      userLogger,
       buildTargetIdentifier
     )(ec)
 
@@ -226,6 +232,7 @@ class ScalaPresentationCompiler(
             config,
             sh,
             () => new ScalaCompilerWrapper(newCompiler()),
+            userLogger,
             s"$buildTargetIdentifier-batch-$i"
           )(ec)
         }.toArray
@@ -1083,14 +1090,33 @@ class ScalaPresentationCompiler(
     }
     val (isSuccess, unprocessed) =
       settings.processArguments(options, processAll = true)
-    if (unprocessed.nonEmpty || !isSuccess) {
-      logger.warn(s"Unknown compiler options: ${unprocessed.mkString(", ")}")
-    }
+    userLogger.accept(
+      s"Creating new interactive compiler for Scala ${BuildInfo.scalaCompilerVersion}"
+    )
+    userLogger.accept(s"Build target: $buildTargetIdentifier")
+    if (unprocessed.nonEmpty || !isSuccess)
+      userLogger.accept(
+        s"Warning: unknown compiler options: ${unprocessed.mkString(", ")}"
+      )
+    userLogger.accept(s"Settings: ${settings.toConciseString}")
+    userLogger.accept("Class path:")
+    for (file <- this.classpath)
+      userLogger.accept(s"  $file")
     try {
       // settings are needed during the constructor of interactive.Global
       // and the reporter doesn't have a reference to global yet
-      val reporter = new MetalsReporter(settings)
+      val reporter = new MetalsReporter(settings) {
+        override def doReport(
+            pos: scala.reflect.internal.util.Position,
+            msg: String,
+            severity: Severity
+        ): Unit = {
+          userLogger.accept(s"$severity [$pos] $msg")
+          super.doReport(pos, msg, severity)
+        }
+      }
       val mg = new MetalsGlobal(
+        userLogger,
         settings,
         reporter,
         search,
@@ -1108,7 +1134,7 @@ class ScalaPresentationCompiler(
           if scalaVersion.startsWith("2.") && !withClearedCaches =>
         val cleared = JrtClasspathCompat.clearJrtClassPathCaches(logger)
         if (cleared) {
-          logger.warn(
+          userLogger.accept(
             s"Cleared JrtClassPath caches, to try and fix `${e.getMessage()}`"
           )
           newCompiler(withClearedCaches = true)

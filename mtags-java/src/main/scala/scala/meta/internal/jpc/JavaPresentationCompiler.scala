@@ -64,6 +64,7 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
 case class JavaPresentationCompiler(
+    userLogger: java.util.function.Consumer[String],
     override val buildTargetId: String = "",
     classpath: Seq[Path] = Nil,
     options: List[String] = Nil,
@@ -90,10 +91,17 @@ case class JavaPresentationCompiler(
     config,
     sh,
     () =>
-      new JavaMetalsCompilerWrapper(() =>
+      new JavaMetalsCompilerWrapper(() => {
+        userLogger.accept(
+          s"Creating new Java presentation compiler for $buildTargetId"
+        )
+        userLogger.accept("Class path:")
+        for (p <- classpath)
+          userLogger.accept(s"  $p")
         new JavaMetalsCompiler(
           buildTargetId,
           logger,
+          userLogger,
           reportsLevel,
           search,
           embedded,
@@ -104,7 +112,8 @@ case class JavaPresentationCompiler(
           progressBars,
           sh
         )
-      ),
+      }),
+    userLogger,
     s"javac-$buildTargetId"
   )(ec)
   implicit val reportContext: ReportContext =

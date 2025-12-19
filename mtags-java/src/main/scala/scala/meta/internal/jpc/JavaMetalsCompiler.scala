@@ -45,6 +45,7 @@ import org.slf4j.Logger
 class JavaMetalsCompiler(
     val buildTargetId: String,
     val logger: Logger,
+    val userLogger: java.util.function.Consumer[String],
     val reportsLevel: ReportLevel,
     val search: SymbolSearch,
     val embedded: EmbeddedClient,
@@ -230,7 +231,8 @@ class JavaMetalsCompiler(
           }
         }
       },
-      metalsConfig.hoverContentType()
+      metalsConfig.hoverContentType(),
+      userLogger
     )
 
     Option(doc.orElse(null)) match {

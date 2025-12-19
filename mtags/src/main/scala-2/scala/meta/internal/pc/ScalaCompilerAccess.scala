@@ -53,6 +53,7 @@ class ScalaCompilerAccess(
     config: PresentationCompilerConfig,
     sh: Option[ScheduledExecutorService],
     newCompiler: () => ScalaCompilerWrapper,
+    userLogger: java.util.function.Consumer[String],
     id: String = ""
 )(implicit ec: ExecutionContextExecutor)
     extends CompilerAccess[MetalsReporter, MetalsGlobal](
@@ -61,6 +62,7 @@ class ScalaCompilerAccess(
       sh,
       newCompiler,
       shouldResetJobQueue = false,
+      userLogger,
       id
     ) {
 

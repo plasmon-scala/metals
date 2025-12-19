@@ -1,5 +1,7 @@
 package scala.meta.internal.metals
 
+import java.io.ByteArrayOutputStream
+import java.nio.charset.StandardCharsets
 import java.nio.file.Path
 import java.util.Optional
 
@@ -35,19 +37,20 @@ import org.slf4j.LoggerFactory
  */
 class Docstrings(index: GlobalSymbolIndex, mtags: () => Mtags) {
   val cache = new TrieMap[Content, SymbolDocumentation]()
-  private val logger = LoggerFactory.getLogger(classOf[Docstrings])
+  private val logger0 = LoggerFactory.getLogger(classOf[Docstrings])
 
   def documentation(
       symbol: String,
       parents: ParentSymbols,
-      contentType: ContentType
+      contentType: ContentType,
+      logger: java.util.function.Consumer[String]
   ): Optional[SymbolDocumentation] = {
     val result = getFromCacheWithProxy(symbol, contentType) match {
       case Some(value) =>
         if (value == EmptySymbolDocumentation) None
         else Some(value)
       case None =>
-        indexSymbol(symbol, contentType)
+        indexSymbol(symbol, contentType, logger)
         val result = getFromCacheWithProxy(symbol, contentType)
         if (result.isEmpty)
           cache(Content.from(symbol, contentType)) = EmptySymbolDocumentation
@@ -59,14 +62,15 @@ class Docstrings(index: GlobalSymbolIndex, mtags: () => Mtags) {
     val resultWithParentDocs = result match {
       case Some(value: MetalsSymbolDocumentation)
           if value.docstring.isEmpty() =>
-        Some(parentDocumentation(symbol, value, parents, contentType))
+        Some(parentDocumentation(symbol, value, parents, contentType, logger))
       case None =>
         Some(
           parentDocumentation(
             symbol,
             MetalsSymbolDocumentation.empty(symbol),
             parents,
-            contentType
+            contentType,
+            logger
           )
         )
       case _ => result
@@ -78,14 +82,15 @@ class Docstrings(index: GlobalSymbolIndex, mtags: () => Mtags) {
       symbol: String,
       docs: MetalsSymbolDocumentation,
       parents: ParentSymbols,
-      contentType: ContentType
+      contentType: ContentType,
+      logger: java.util.function.Consumer[String]
   ): SymbolDocumentation = {
     parents
       .parents()
       .asScala
       .flatMap { s =>
         getFromCacheWithProxy(s, contentType).orElse {
-          indexSymbol(s, contentType)
+          indexSymbol(s, contentType, logger)
           getFromCacheWithProxy(s, contentType)
         }
       }
@@ -141,15 +146,34 @@ class Docstrings(index: GlobalSymbolIndex, mtags: () => Mtags) {
     cache(Content.from(doc.symbol(), contentType)) = doc
   }
 
-  private def indexSymbol(symbol: String, contentType: ContentType): Unit = {
+  private def indexSymbol(
+      symbol: String,
+      contentType: ContentType,
+      logger: java.util.function.Consumer[String]
+  ): Unit = {
     index.definition(Symbol(symbol)) match {
       case Some(defn) =>
         try {
+          if (logger != null)
+            logger.accept(s"Indexing javadoc / scaladoc of $symbol")
           indexSymbolDefinition(defn, contentType)
           maybeCacheAlternative(defn, contentType)
+          if (logger != null) logger.accept("Done indexing javadoc / scaladoc")
         } catch {
           case NonFatal(e) =>
-            logger.error(defn.path.toURI.toString, e)
+            logger0.error(defn.path.toURI.toString, e)
+            if (logger != null) {
+              logger.accept(
+                s"Error while indexing javadoc / scaladoc of $symbol"
+              )
+              val baos = new ByteArrayOutputStream
+              e.printStackTrace(
+                new java.io.PrintStream(baos, true, StandardCharsets.UTF_8)
+              )
+              logger.accept(
+                new String(baos.toByteArray, StandardCharsets.UTF_8)
+              )
+            }
         }
       case None =>
     }

@@ -343,11 +343,14 @@ class HoverProvider(
         )
       }
 
-    if (result.isEmpty) {
-      report.foreach(r =>
-        reportContext.unsanitized().create(() => r, /*ifVerbose = true*/ true)
-      )
-    }
+    if (result.isEmpty)
+      for (report0 <- report) {
+        reportContext
+          .unsanitized()
+          .create(() => report0, /*ifVerbose = true*/ true)
+        val content = report0.fullText(withIdAndSummary = true)
+        compiler.userLogger.accept(content)
+      }
     result
   }
 
@@ -362,7 +365,7 @@ class HoverProvider(
       pos: Position,
       unit: RichCompilationUnit
   ): Tree = {
-    typeCheck(unit)
+    metalsTypeCheck(unit)
     val typedTree = locateTree(pos)
     typedTree match {
       case Import(qual, _) if qual.pos.includes(pos) =>

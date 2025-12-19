@@ -13,12 +13,16 @@ public interface SymbolSearch {
 
   /** Returns the documentation of this symbol, if any. */
   @Deprecated
-  Optional<SymbolDocumentation> documentation(String symbol, ParentSymbols parents);
+  Optional<SymbolDocumentation> documentation(
+      String symbol, ParentSymbols parents, java.util.function.Consumer<String> logger);
 
   /** Returns the documentation of this symbol, if any. */
   default Optional<SymbolDocumentation> documentation(
-      String symbol, ParentSymbols parents, ContentType contentType) {
-    return documentation(symbol, parents);
+      String symbol,
+      ParentSymbols parents,
+      ContentType contentType,
+      java.util.function.Consumer<String> logger) {
+    return documentation(symbol, parents, logger);
   }
 
   /** Returns the definition of this symbol, if any. */

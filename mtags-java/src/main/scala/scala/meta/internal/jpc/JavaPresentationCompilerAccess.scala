@@ -15,6 +15,7 @@ class JavaPresentationCompilerAccess(
     config: PresentationCompilerConfig,
     sh: Option[ScheduledExecutorService],
     newCompiler: () => JavaMetalsCompilerWrapper,
+    userLogger: java.util.function.Consumer[String],
     id: String = ""
 )(implicit ec: ExecutionContextExecutor)
     extends CompilerAccess[Unit, JavaMetalsCompiler](
@@ -23,6 +24,7 @@ class JavaPresentationCompilerAccess(
       sh,
       newCompiler,
       shouldResetJobQueue = false,
+      userLogger,
       id
     ) {
   override protected def newReporter: Unit = ()

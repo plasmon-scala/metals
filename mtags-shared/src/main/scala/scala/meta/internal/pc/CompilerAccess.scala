@@ -1,5 +1,8 @@
 package scala.meta.internal.pc
 
+import java.io.ByteArrayOutputStream
+import java.io.PrintStream
+import java.nio.charset.StandardCharsets
 import java.time.Duration
 import java.util.concurrent.CancellationException
 import java.util.concurrent.CompletableFuture
@@ -29,6 +32,7 @@ abstract class CompilerAccess[Reporter, Compiler](
     sh: Option[ScheduledExecutorService],
     newCompiler: () => CompilerWrapper[Reporter, Compiler],
     shouldResetJobQueue: Boolean,
+    userLogger: java.util.function.Consumer[String],
     id: String = ""
 )(implicit ec: ExecutionContextExecutor) {
 
@@ -205,21 +209,32 @@ abstract class CompilerAccess[Reporter, Compiler](
     } catch {
       case InterruptException() =>
         default
-      case other: Throwable
-          if java.lang.Boolean.getBoolean("plasmon.enable-interactive-retry") =>
-        handleSharedCompilerException(other)
-          .map { message =>
-            retryWithCleanCompiler(
-              thunk,
-              default,
-              message,
-              other
-            )
-          }
-          .getOrElse {
-            handleError(other)
-            default
-          }
+      case ex: Throwable =>
+        val exStr = {
+          val baos = new ByteArrayOutputStream
+          val ps = new PrintStream(baos, true, StandardCharsets.UTF_8)
+          ex.printStackTrace(ps)
+          new String(baos.toByteArray, StandardCharsets.UTF_8)
+        }
+        userLogger.accept("Caught exception")
+        userLogger.accept(exStr)
+
+        if (java.lang.Boolean.getBoolean("plasmon.enable-interactive-retry"))
+          handleSharedCompilerException(ex)
+            .map { message =>
+              retryWithCleanCompiler(
+                thunk,
+                default,
+                message,
+                ex
+              )
+            }
+            .getOrElse {
+              handleError(ex)
+              default
+            }
+        else
+          default
     }
   }
 
