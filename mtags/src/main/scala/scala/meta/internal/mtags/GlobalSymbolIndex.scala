@@ -44,26 +44,6 @@ trait GlobalSymbolIndex {
   ): List[SymbolDefinition]
 
   /**
-   * Add an individual Java or Scala source file to the index.
-   *
-   * @param file the absolute path to the source file, can be a path
-   *            on disk or inside of a jar/zip file.
-   * @param sourceDirectory the enclosing project source directory if
-   *                        file is on disk, used to relativize `file`.
-   *                        Can be None if file is inside a zip file
-   *                        assuming the file path is already relativized
-   *                        by that point.
-   * @throws Exception in case of problems processing the source file
-   *                   such as tokenization failure due to an unclosed
-   *                   literal.
-   */
-  def addSourceFile(
-      module: GlobalSymbolIndex.Module,
-      file: SourcePath,
-      dialect: Dialect
-  )(implicit ctx: SourcePath.Context): Option[IndexingResult]
-
-  /**
    * Index a jar or zip file containing Scala and Java source files.
    *
    * Published artifacts typically have accompanying sources.jar files that

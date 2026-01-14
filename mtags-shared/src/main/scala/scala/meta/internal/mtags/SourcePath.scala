@@ -1,14 +1,15 @@
 package scala.meta.internal.mtags
 
-import java.io.FileNotFoundException
+import scala.jdk.CollectionConverters._
+import java.nio.file.Path
+import java.nio.charset.Charset
+import java.nio.charset.StandardCharsets
 import java.net.URI
-import java.nio.charset.{Charset, StandardCharsets}
-import java.nio.file.{Files, Path, Paths}
+import java.nio.file.Paths
+import java.nio.file.Files
 import java.util.concurrent.ConcurrentHashMap
 import java.util.zip.ZipFile
-
-import scala.jdk.CollectionConverters._
-import scala.meta.internal.mtags.CommonMtagsEnrichments._
+import java.io.FileNotFoundException
 
 sealed abstract class SourcePath extends Product with Serializable {
   def uri: String
@@ -19,9 +20,6 @@ sealed abstract class SourcePath extends Product with Serializable {
 
   def exists()(implicit context: SourcePath.Context): Boolean
 
-  def isScalaScript: Boolean = false
-  def isMill: Boolean = false
-
   def extension: String
 }
 
@@ -31,7 +29,7 @@ object SourcePath {
     if (uri0.getScheme == "jar" && uri0.getRawSchemeSpecificPart != null)
       uri0.getRawSchemeSpecificPart.split("!/", 2) match {
         case Array(zipUri, pathInZip) =>
-          ZipEntry(Paths.get(new URI(zipUri)), pathInZip)
+          ZipEntry(Paths.get(new URI(zipUri)), pathInZip, -1L)
         case Array(_) =>
           throw new Exception(
             s"Malformed jar URI: '$uri' (missing '!' path-in-zip part, like in jar:file://path/to.zip!path/in/zip)"
@@ -50,19 +48,18 @@ object SourcePath {
       Files.readString(path, charSet)
     def exists()(implicit context: SourcePath.Context): Boolean =
       Files.exists(path)
-    override def isScalaScript: Boolean =
-      path.toString.isScalaScript
-    override def isMill: Boolean =
-      path.toString.isMill
     def extension: String = {
-      val fileName = path.getFileName.toString
-      val idx = fileName.lastIndexOf('.')
-      if (idx == -1) ""
-      else fileName.substring(idx + 1)
+      val name = path.getFileName.toString()
+      val idx = name.lastIndexOf('.')
+      if (idx < 0) ""
+      else name.drop(idx + 1)
     }
   }
-  final case class ZipEntry(zipPath: Path, pathInZip: String)
-      extends SourcePath {
+  final case class ZipEntry(
+      zipPath: Path,
+      pathInZip: String,
+      lastModified: Long
+  ) extends SourcePath {
     def uri: String =
       "jar:" + zipPath.toUri.toASCIIString + "!/" + pathInZip
     def filePath: Option[Path] = None
@@ -105,7 +102,7 @@ object SourcePath {
         .entries()
         .asScala
         .filter(!_.getName.endsWith("/"))
-        .map(ent => ZipEntry(path, ent.getName))
+        .map(ent => ZipEntry(path, ent.getName, ent.getTime))
     def close(): Unit =
       for ((path, zf) <- map.asScala.toVector) {
         map.remove(path, zf)
