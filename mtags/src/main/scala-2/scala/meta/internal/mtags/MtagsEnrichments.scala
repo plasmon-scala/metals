@@ -27,6 +27,13 @@ import org.eclipse.{lsp4j => l}
 object MtagsEnrichments extends MtagsEnrichments
 trait MtagsEnrichments extends ScalametaCommonEnrichments {
 
+  implicit class XtensionSourcePathInput(path: m.internal.mtags.SourcePath) {
+    def toInput(implicit
+        context: m.internal.mtags.SourcePath.Context
+    ): m.inputs.Input.VirtualFile =
+      m.inputs.Input.VirtualFile(path.uri, path.content())
+  }
+
   implicit class XtensionIteratorCollection[T](it: Iterator[T]) {
     def headOption: Option[T] = {
       if (it.hasNext) Some(it.next())
