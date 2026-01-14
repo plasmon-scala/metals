@@ -13,6 +13,7 @@ import scala.meta.pc.HoverSignature
 import scala.meta.pc.OffsetParams
 import scala.meta.pc.RangeParams
 import scala.meta.pc.reports.ReportContext
+import scala.meta.internal.mtags.GlobalSymbolIndex
 
 class HoverProvider(
     val compiler: MetalsGlobal,
@@ -21,16 +22,20 @@ class HoverProvider(
 )(implicit reportContext: ReportContext, queryInfo: PcQueryContext) {
   import compiler._
 
-  def hover(): Option[HoverSignature] = params match {
-    case range: RangeParams =>
-      range.trimWhitespaceInRange.flatMap(hoverOffset)
-    case _
-        if params.isWhitespace && params.prevIsWhitespaceOrDelimeter && !params.isWithinBackticks =>
-      None
-    case _ => hoverOffset(params)
-  }
+  def hover(module: GlobalSymbolIndex.Module): Option[HoverSignature] =
+    params match {
+      case range: RangeParams =>
+        range.trimWhitespaceInRange.flatMap(hoverOffset(module, _))
+      case _
+          if params.isWhitespace && params.prevIsWhitespaceOrDelimeter && !params.isWithinBackticks =>
+        None
+      case _ => hoverOffset(module, params)
+    }
 
-  def hoverOffset(params: OffsetParams): Option[HoverSignature] = {
+  def hoverOffset(
+      module: GlobalSymbolIndex.Module,
+      params: OffsetParams
+  ): Option[HoverSignature] = {
     val unit = addCompilationUnit(
       code = params.text(),
       filename = params.uri().toString(),
@@ -113,6 +118,7 @@ class HoverProvider(
         for {
           member <- i.selector(pos)
           hover <- toHover(
+            module,
             member,
             member.keyString,
             member.info,
@@ -134,6 +140,7 @@ class HoverProvider(
             if (expanded.symbol.isConstructor) expanded.symbol
             else tree.symbol
           toHover(
+            module,
             symbol,
             symbol.keyString,
             seenFromType(tree, symbol),
@@ -148,6 +155,7 @@ class HoverProvider(
             tpe <- Option(tree.tpe)
             seenFrom = seenFromType(tree, sym)
             hover <- toHover(
+              module,
               sym,
               sym.keyString,
               seenFrom,
@@ -163,6 +171,7 @@ class HoverProvider(
         }
       case UnApply(fun, _) if fun.symbol != null =>
         toHover(
+          module,
           fun.symbol,
           fun.symbol.keyString,
           seenFromType(tree, fun.symbol),
@@ -183,6 +192,7 @@ class HoverProvider(
           case getter => getter
         }
         toHover(
+          module,
           symbol,
           v.symbol.keyString,
           symbol.info,
@@ -195,6 +205,7 @@ class HoverProvider(
       case _: Bind =>
         val symbol = tree.symbol
         toHover(
+          module = module,
           symbol = symbol,
           keyword = "",
           seenFrom = symbol.info,
@@ -206,6 +217,7 @@ class HoverProvider(
       case _: Literal if params.isInstanceOf[RangeParams] =>
         val symbol = tree.symbol
         toHover(
+          module = module,
           symbol = symbol,
           keyword = "",
           seenFrom = null,
@@ -223,6 +235,7 @@ class HoverProvider(
         val symbol = tree.symbol
         val tpe = seenFromType(tree, symbol)
         toHover(
+          module = module,
           symbol = symbol,
           keyword = symbol.keyString,
           seenFrom = tpe,
@@ -239,13 +252,23 @@ class HoverProvider(
   }
 
   def toHover(
+      module: GlobalSymbolIndex.Module,
       symbol: Symbol,
       pos: Position
   ): Option[HoverSignature] = {
-    toHover(symbol, symbol.keyString, symbol.info, symbol.info, pos, pos)
+    toHover(
+      module,
+      symbol,
+      symbol.keyString,
+      symbol.info,
+      symbol.info,
+      pos,
+      pos
+    )
   }
 
   def toHover(
+      module: GlobalSymbolIndex.Module,
       symbol: Symbol,
       keyword: String,
       seenFrom: Type,
@@ -257,9 +280,9 @@ class HoverProvider(
 
     def docstring =
       if (metalsConfig.isHoverDocumentationEnabled) {
-        symbolDocumentation(symbol, contentType)
+        symbolDocumentation(module, symbol, contentType)
           .filter(docs => !docs.docstring().isEmpty())
-          .orElse(symbolDocumentation(symbol.companion, contentType))
+          .orElse(symbolDocumentation(module, symbol.companion, contentType))
           .fold("")(_.docstring())
       } else {
         ""
@@ -313,7 +336,7 @@ class HoverProvider(
           symbol,
           history,
           symbolInfo.widen,
-          includeDocs = true
+          moduleIfIncludeDocs = Some(module)
         )
         val name =
           if (symbol.isConstructor) "this"
