@@ -3,6 +3,7 @@ package scala.meta.internal.mtags
 import java.util.concurrent.ConcurrentHashMap
 
 import scala.collection.concurrent.TrieMap
+import scala.jdk.CollectionConverters._
 
 /**
  * This class is a wrapper around TrieMap that provides atomic updateWith
@@ -12,6 +13,15 @@ final class AtomicTrieMap[K, V] {
   private val concurrentMap = new ConcurrentHashMap[K, V]
 
   override def toString(): String = trieMap.toString()
+
+  def duplicate(): AtomicTrieMap[K, V] = {
+    val copy = new AtomicTrieMap[K, V]
+    copy.trieMap ++= trieMap
+    for (e <- concurrentMap.entrySet().asScala)
+      copy.concurrentMap.put(e.getKey, e.getValue)
+    copy
+  }
+
   def get(key: K): Option[V] = trieMap.get(key)
 
   def contains(key: K): Boolean = trieMap.contains(key)

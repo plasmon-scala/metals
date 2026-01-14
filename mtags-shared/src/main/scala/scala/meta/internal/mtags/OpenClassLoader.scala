@@ -16,7 +16,7 @@ final class OpenClassLoader {
 
   // from https://github.com/scalameta/scalameta/blob/491b8b28b6e7c3a75994bba4caf5c4b4fee526a2/scalameta/io/jvm/src/main/scala/scala/meta/internal/io/PlatformFileIO.scala#L103-L105
   private def newFileSystem(path: Path): FileSystem = {
-    val uri = URI.create("jar:" + path.toUri.toString)
+    val uri = URI.create("jar:" + path.toUri.toASCIIString)
     try FileSystems.newFileSystem(uri, new util.HashMap[String, Object])
     catch {
       case _: FileSystemAlreadyExistsException => FileSystems.getFileSystem(uri)
@@ -77,5 +77,12 @@ final class OpenClassLoader {
 
   def list(): Seq[Path] =
     map.keysIterator.toVector
+
+  def duplicate(): OpenClassLoader = {
+    val copy = new OpenClassLoader
+    copy.isAdded ++= isAdded
+    copy.map ++= map
+    copy
+  }
 
 }

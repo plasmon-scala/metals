@@ -6,6 +6,7 @@ import scala.collection.mutable.ListBuffer
 
 import scala.meta.internal.jdk.CollectionConverters._
 import scala.meta.internal.metals.PcQueryContext
+import scala.meta.internal.mtags.GlobalSymbolIndex
 import scala.meta.pc
 import scala.meta.pc.SymbolDocumentation
 
@@ -292,15 +293,13 @@ trait Signatures { compiler: MetalsGlobal =>
       gsym: Symbol,
       shortenedNames: ShortenedNames,
       gtpe: Type,
-      includeDocs: Boolean,
+      moduleIfIncludeDocs: Option[GlobalSymbolIndex.Module],
       includeDefaultParam: Boolean = true,
       printLongType: Boolean = true
   )(implicit queryInfo: PcQueryContext) {
     private val info: Option[SymbolDocumentation] =
-      if (includeDocs) {
-        symbolDocumentation(gsym)
-      } else {
-        None
+      moduleIfIncludeDocs.flatMap { module =>
+        symbolDocumentation(module, gsym)
       }
     private val infoParamsA: Seq[pc.SymbolDocumentation] = info match {
       case Some(value) =>

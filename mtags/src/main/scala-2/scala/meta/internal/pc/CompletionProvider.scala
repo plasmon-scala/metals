@@ -9,6 +9,7 @@ import scala.util.control.NonFatal
 
 import scala.meta.internal.jdk.CollectionConverters._
 import scala.meta.internal.metals.PcQueryContext
+import scala.meta.internal.mtags.GlobalSymbolIndex
 import scala.meta.internal.mtags.MtagsEnrichments._
 import scala.meta.internal.mtags.SourcePath
 import scala.meta.pc.OffsetParams
@@ -51,7 +52,7 @@ class CompletionProvider(
     }
   }
 
-  def completions(): CompletionList = {
+  def completions(module: GlobalSymbolIndex.Module): CompletionList = {
     val filename = params.uri().toString()
     val unit = addCompilationUnit(
       code = params.text,
@@ -65,7 +66,7 @@ class CompletionProvider(
 
     val (i, completion, identOffsets, editRange, query) =
       SourcePath.withContext { implicit ctx =>
-        safeCompletionsAt(pos, params.uri())
+        safeCompletionsAt(module, pos, params.uri())
       }
 
     val InferredIdentOffsets(
@@ -336,7 +337,7 @@ class CompletionProvider(
       item.setData(
         CompletionItemData(
           semanticdbSymbol(member.sym),
-          buildTargetIdentifier,
+          module.targetId,
           kind = completionItemDataKind,
           additionalSymbols
         ).toJson
@@ -367,6 +368,7 @@ class CompletionProvider(
   }
 
   private def filterInteresting(
+      module: GlobalSymbolIndex.Module,
       completions: List[Member],
       kind: CompletionListKind,
       query: String,
@@ -446,7 +448,7 @@ class CompletionProvider(
               pos,
               visit
             )
-            workspaceExtensionMethods(query, pos, visit, qualifier.tpe)
+            workspaceExtensionMethods(module, query, pos, visit, qualifier.tpe)
           case _ => SymbolSearch.Result.COMPLETE
         }
       }
@@ -455,6 +457,7 @@ class CompletionProvider(
   }
 
   private def workspaceExtensionMethods(
+      module: GlobalSymbolIndex.Module,
       query: String,
       pos: Position,
       visit: Member => Boolean,
@@ -475,7 +478,7 @@ class CompletionProvider(
           }
         } else false
     )
-    search.searchMethods(query, buildTargetIdentifier, visitor)
+    search.searchMethods(query, module.asString, visitor)
   }
 
   private def isFunction(symbol: Symbol): Boolean = {
@@ -511,6 +514,7 @@ class CompletionProvider(
   }
 
   private def safeCompletionsAt(
+      module: GlobalSymbolIndex.Module,
       pos: Position,
       source: URI
   )(implicit
@@ -530,6 +534,7 @@ class CompletionProvider(
     val noQuery = "$a"
     def expected(e: Throwable) = {
       completionPosition(
+        module,
         pos,
         source,
         params.text(),
@@ -659,6 +664,7 @@ class CompletionProvider(
       try {
         val latestParentTrees = getLastVisitedParentTrees(pos)
         val completion = completionPosition(
+          module,
           pos,
           source,
           params.text(),
@@ -667,6 +673,7 @@ class CompletionProvider(
           latestParentTrees
         )
         val items = filterInteresting(
+          module,
           matchingResults,
           kind,
           query,
@@ -807,14 +814,14 @@ class CompletionProvider(
    *
    * @return the list of TextEdits for missing implements and imports.
    */
-  def implementAll(): ju.List[l.TextEdit] = {
+  def implementAll(module: GlobalSymbolIndex.Module): ju.List[l.TextEdit] = {
     val unit = addCompilationUnit(
       code = params.text,
       filename = params.uri().toString(),
       cursor = None
     )
     val pos = unit.position(params.offset)
-    implementAllAt(pos, params.text).asJava
+    implementAllAt(module, pos, params.text).asJava
   }
 
 }

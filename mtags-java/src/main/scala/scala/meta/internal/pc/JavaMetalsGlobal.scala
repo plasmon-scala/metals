@@ -42,6 +42,7 @@ import com.sun.source.util.Trees
 import org.eclipse.lsp4j.Position
 
 class JavaMetalsGlobal(
+    moduleString: String,
     val search: SymbolSearch,
     val metalsConfig: PresentationCompilerConfig,
     val classpath: Seq[Path],
@@ -166,6 +167,7 @@ class JavaMetalsGlobal(
     val sym = semanticdbSymbol(element)
     search
       .documentation(
+        moduleString,
         sym,
         new ParentSymbols {
           override def parents(): java.util.List[String] = {

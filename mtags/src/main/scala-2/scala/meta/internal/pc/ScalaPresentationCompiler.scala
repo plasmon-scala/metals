@@ -24,6 +24,7 @@ import scala.meta.internal.metals.EmptyCancelToken
 import scala.meta.internal.metals.PcQueryContext
 import scala.meta.internal.metals.ReportLevel
 import scala.meta.internal.mtags.BuildInfo
+import scala.meta.internal.mtags.GlobalSymbolIndex
 import scala.meta.internal.mtags.MtagsEnrichments._
 import scala.meta.internal.mtags.SourcePath
 import scala.meta.pc.AutoImportsResult
@@ -61,7 +62,7 @@ class ScalaPresentationCompiler(
     userLoggerSupplier: java.util.function.Supplier[
       java.util.function.Consumer[String]
     ],
-    var buildTargetIdentifier: String = "",
+    var module: GlobalSymbolIndex.Module,
     var buildTargetName: Option[String] = None,
     var classpath: Seq[Path] = Nil,
     var options: List[String] = Nil,
@@ -185,11 +186,11 @@ class ScalaPresentationCompiler(
   def isLoaded(): Boolean = compilerAccess.isLoaded()
 
   override def newInstance(
-      buildTargetIdentifier: String,
+      moduleString: String,
       classpath: util.List[Path],
       options: util.List[String]
   ): this.type = {
-    this.buildTargetIdentifier = buildTargetIdentifier
+    this.module = GlobalSymbolIndex.Module.fromString(moduleString)
     this.classpath = classpath.asScala
     this.options = options.asScala.toList
     this
@@ -267,7 +268,7 @@ class ScalaPresentationCompiler(
       params.uri.toASCIIString
     ) { pc =>
       new CompletionProvider(pc.compiler(params), params)
-        .completions()
+        .completions(module)
     }
   }
 
@@ -320,7 +321,8 @@ class ScalaPresentationCompiler(
       "implementAbstractMembers",
       params.uri.toASCIIString
     ) { pc =>
-      new CompletionProvider(pc.compiler(params), params).implementAll()
+      new CompletionProvider(pc.compiler(params), params)
+        .implementAll(module)
     }
   }
 
@@ -475,7 +477,7 @@ class ScalaPresentationCompiler(
   ): CompletableFuture[CompletionItem] =
     CompletableFuture.completedFuture {
       compilerAccess.withSharedCompiler(item, "") { pc =>
-        new CompletionItemResolver(pc.compiler()).resolve(item, symbol)
+        new CompletionItemResolver(pc.compiler()).resolve(module, item, symbol)
       }(emptyQueryContext)
     }
 
@@ -490,7 +492,7 @@ class ScalaPresentationCompiler(
       params.uri.toASCIIString
     ) { pc =>
       new SignatureHelpProvider(pc.compiler(params))
-        .signatureHelp(params)
+        .signatureHelp(module, params)
     }
   }
 
@@ -554,7 +556,7 @@ class ScalaPresentationCompiler(
           params,
           config.hoverContentType()
         )
-          .hover()
+          .hover(module)
           .orNull
       )
     }
@@ -568,7 +570,7 @@ class ScalaPresentationCompiler(
       params.uri.toASCIIString
     ) { pc =>
       new PcDefinitionProvider(pc.compiler(params), params)
-        .definition()
+        .definition(module)
     }(params.toQueryContext)
   }
 
@@ -595,7 +597,7 @@ class ScalaPresentationCompiler(
       params.uri.toASCIIString
     ) { pc =>
       new PcDefinitionProvider(pc.compiler(params), params)
-        .typeDefinition()
+        .typeDefinition(module)
     }(params.toQueryContext)
   }
 
@@ -672,7 +674,7 @@ class ScalaPresentationCompiler(
     }
   }
 
-  override def buildTargetId(): String = buildTargetIdentifier
+  override def buildTargetId(): String = module.targetId
 
   def newCompiler(withClearedCaches: Boolean = false): MetalsGlobal = {
     val classpath = this.classpath.mkString(File.pathSeparator)
@@ -699,7 +701,7 @@ class ScalaPresentationCompiler(
     userLogger.accept(
       s"Creating new interactive compiler for Scala ${BuildInfo.scalaCompilerVersion}"
     )
-    userLogger.accept(s"Build target: $buildTargetIdentifier")
+    userLogger.accept(s"Module: ${module.asString}")
     if (unprocessed.nonEmpty || !isSuccess)
       userLogger.accept(
         s"Warning: unknown compiler options: ${unprocessed.mkString(", ")}"
@@ -722,7 +724,7 @@ class ScalaPresentationCompiler(
         }
       },
       search,
-      buildTargetIdentifier,
+      module.asString,
       config,
       folderPath,
       completionItemPriority

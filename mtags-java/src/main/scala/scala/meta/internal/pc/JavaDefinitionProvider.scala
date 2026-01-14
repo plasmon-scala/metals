@@ -23,6 +23,7 @@ import org.eclipse.lsp4j.Position
 import org.eclipse.lsp4j.Range
 
 class JavaDefinitionProvider(
+    moduleString: String,
     compiler: JavaMetalsGlobal,
     params: OffsetParams
 ) {
@@ -138,7 +139,10 @@ class JavaDefinitionProvider(
         }
 
       val searchLocations = if (locations.isEmpty && symbol.nonEmpty) {
-        compiler.search.definition(symbol, params.uri()).asScala.toList
+        compiler.search
+          .definition(moduleString, symbol, params.uri())
+          .asScala
+          .toList
       } else {
         Nil
       }
@@ -169,7 +173,10 @@ class JavaDefinitionProvider(
       val symbol = convertImportToSemanticdbSymbol(leafString)
       if (symbol.nonEmpty) try {
         val locations =
-          compiler.search.definition(symbol, params.uri()).asScala.toList
+          compiler.search
+            .definition(moduleString, symbol, params.uri())
+            .asScala
+            .toList
         Some(DefinitionResultImpl(symbol, locations.asJava))
       } catch {
         case NonFatal(
