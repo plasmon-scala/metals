@@ -30,7 +30,7 @@ abstract class BaseCodeActionSuite extends BasePCSuite {
     val dialect =
       if (BuildInfoVersions.scalaVersion.startsWith("3")) dialects.Scala3
       else dialects.Scala213
-    try index.addSourceFile(file, Some(tmp), dialect)
+    try index.addSourceFile(file, dialect)
     catch {
       case NonFatal(e) =>
         println(s"warn: $e")
