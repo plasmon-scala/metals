@@ -25,6 +25,7 @@ import scala.meta.internal.metals.PcQueryContext
 import scala.meta.internal.metals.ReportLevel
 import scala.meta.internal.mtags.BuildInfo
 import scala.meta.internal.mtags.MtagsEnrichments._
+import scala.meta.internal.mtags.SourcePath
 import scala.meta.pc.AutoImportsResult
 import scala.meta.pc.CodeActionId
 import scala.meta.pc.CompileResult
@@ -450,9 +451,11 @@ class ScalaPresentationCompiler(
       "autoImports",
       params.uri.toASCIIString
     ) { pc =>
-      new AutoImportsProvider(pc.compiler(params), name, params)
-        .autoImports()
-        .asJava
+      SourcePath.withContext { implicit ctx =>
+        new AutoImportsProvider(pc.compiler(params), name, params)
+          .autoImports()
+          .asJava
+      }
     }
   }
 

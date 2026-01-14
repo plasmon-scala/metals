@@ -10,6 +10,7 @@ import scala.util.control.NonFatal
 import scala.meta.internal.jdk.CollectionConverters._
 import scala.meta.internal.metals.PcQueryContext
 import scala.meta.internal.mtags.MtagsEnrichments._
+import scala.meta.internal.mtags.SourcePath
 import scala.meta.pc.OffsetParams
 import scala.meta.pc.SymbolSearch
 
@@ -63,7 +64,9 @@ class CompletionProvider(
     val isSnippet = isSnippetEnabled(pos, params.text())
 
     val (i, completion, identOffsets, editRange, query) =
-      safeCompletionsAt(pos, params.uri())
+      SourcePath.withContext { implicit ctx =>
+        safeCompletionsAt(pos, params.uri())
+      }
 
     val InferredIdentOffsets(
       start,
@@ -372,7 +375,7 @@ class CompletionProvider(
       editRange: l.Range,
       latestParentTrees: List[Tree],
       text: String
-  ): InterestingMembers = {
+  )(implicit ctx: SourcePath.Context): InterestingMembers = {
     val isSeen = mutable.Set.empty[String]
     val isIgnored = mutable.Set.empty[Symbol]
     val buf = List.newBuilder[Member]
@@ -510,6 +513,8 @@ class CompletionProvider(
   private def safeCompletionsAt(
       pos: Position,
       source: URI
+  )(implicit
+      ctx: SourcePath.Context
   ): (
       InterestingMembers,
       CompletionPosition,

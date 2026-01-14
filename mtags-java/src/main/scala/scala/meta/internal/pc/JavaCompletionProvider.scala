@@ -13,6 +13,7 @@ import javax.lang.model.element.VariableElement
 import scala.annotation.tailrec
 import scala.jdk.CollectionConverters._
 
+import scala.meta.internal.mtags.SourcePath
 import scala.meta.pc.OffsetParams
 
 import com.sun.source.tree.ClassTree
@@ -39,7 +40,7 @@ class JavaCompletionProvider(
 ) {
 
   lazy val identifier = extractIdentifier.toLowerCase
-  def completions(): CompletionList = {
+  def completions()(implicit ctx: SourcePath.Context): CompletionList = {
     val nextIsWhitespace =
       if (params.offset() < params.text().length())
         params.text().charAt(params.offset()).isWhitespace
@@ -320,7 +321,7 @@ class JavaCompletionProvider(
   private def completeWithAutoImport(
       task: JavacTask,
       root: CompilationUnitTree
-  ): List[CompletionItem] = {
+  )(implicit ctx: SourcePath.Context): List[CompletionItem] = {
     val identifier = extractIdentifier
     if (identifier.isEmpty) {
       Nil
@@ -352,7 +353,12 @@ class JavaCompletionProvider(
           } else false
         }
       )
-      compiler.search.search(identifier, buildTargetIdentifier, visitor)
+      compiler.search.search(
+        identifier,
+        buildTargetIdentifier,
+        visitor,
+        ctx.iface
+      )
       result.result()
     }
   }

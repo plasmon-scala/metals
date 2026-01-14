@@ -50,7 +50,8 @@ public interface SymbolSearch {
      */
     Result search(String query,
                   String buildTargetIdentifier,
-                  SymbolSearchVisitor visitor);
+                  SymbolSearchVisitor visitor,
+                  SourcePathContext ctx);
     
     /**
      * Runs fuzzy symbol search for the given query, optionally filtering by toplevel member kind.
@@ -67,9 +68,10 @@ public interface SymbolSearch {
     default Result search(String query,
                   String buildTargetIdentifier,
                   Optional<MemberKind> kind,
-                  SymbolSearchVisitor visitor) {
+                  SymbolSearchVisitor visitor,
+                  SourcePathContext ctx) {
         // Default implementation ignores the kind filter and delegates to the simpler overload
-        return search(query, buildTargetIdentifier, visitor);
+        return search(query, buildTargetIdentifier, visitor, ctx);
     }
     
     Result searchMethods(String query,

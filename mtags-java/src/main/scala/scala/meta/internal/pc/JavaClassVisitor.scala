@@ -6,6 +6,7 @@ import javax.lang.model.util.Elements
 
 import scala.jdk.CollectionConverters._
 
+import scala.meta.pc.SourcePathContext
 import scala.meta.pc.SymbolSearchVisitor
 
 import org.eclipse.lsp4j.Range
@@ -37,7 +38,11 @@ class JavaClassVisitor(elements: Elements, visitMember: Element => Boolean)
     elements.getPackageElement(toDotPackage(pkg)) != null
   }
 
-  override def visitClassfile(pkg: String, filename: String): Int = {
+  override def visitClassfile(
+      pkg: String,
+      filename: String,
+      ctx: SourcePathContext
+  ): Int = {
     val pkgElem = elements.getPackageElement(toDotPackage(pkg))
     if (pkgElem == null) return 0
 

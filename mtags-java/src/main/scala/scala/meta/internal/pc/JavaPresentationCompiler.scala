@@ -13,6 +13,7 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContextExecutor
 import scala.jdk.CollectionConverters._
 
+import scala.meta.internal.mtags.SourcePath
 import scala.meta.pc.AutoImportsResult
 import scala.meta.pc.CompileResult
 import scala.meta.pc.DefinitionResult
@@ -61,14 +62,16 @@ case class JavaPresentationCompiler(
   override def complete(
       params: OffsetParams
   ): CompletableFuture[CompletionList] =
-    CompletableFuture.completedFuture(
-      new JavaCompletionProvider(
-        javaCompiler,
-        params,
-        config.isCompletionSnippetsEnabled,
-        buildTargetIdentifier
-      ).completions()
-    )
+    CompletableFuture.completedFuture {
+      SourcePath.withContext { implicit ctx =>
+        new JavaCompletionProvider(
+          javaCompiler,
+          params,
+          config.isCompletionSnippetsEnabled,
+          buildTargetIdentifier
+        ).completions()
+      }
+    }
 
   override def completionItemResolve(
       item: CompletionItem,
@@ -153,14 +156,16 @@ case class JavaPresentationCompiler(
       params: OffsetParams,
       isExtension: lang.Boolean
   ): CompletableFuture[util.List[AutoImportsResult]] =
-    CompletableFuture.completedFuture(
-      new JavaAutoImportsProvider(
-        javaCompiler,
-        params,
-        name,
-        buildTargetIdentifier
-      ).autoImports().asJava
-    )
+    CompletableFuture.completedFuture {
+      SourcePath.withContext { implicit ctx =>
+        new JavaAutoImportsProvider(
+          javaCompiler,
+          params,
+          name,
+          buildTargetIdentifier
+        ).autoImports().asJava
+      }
+    }
 
   override def implementAbstractMembers(
       params: OffsetParams

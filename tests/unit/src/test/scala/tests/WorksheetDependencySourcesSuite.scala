@@ -9,7 +9,8 @@ class WorksheetDependencySourcesSuite extends BaseTablesSuite {
     val worksheet1 = workspace.resolve("w1.worksheet.sc")
     val worksheet2 = workspace.resolve("w2.worksheet.sc")
     assertDiffEqual(
-      dependencySources.setWorksheet(textDocument, worksheet1),
+      dependencySources
+        .setWorksheet(textDocument.toUri.toASCIIString, worksheet1),
       1,
     )
     assertDiffEqual(
@@ -17,7 +18,8 @@ class WorksheetDependencySourcesSuite extends BaseTablesSuite {
       worksheet1,
     )
     assertDiffEqual(
-      dependencySources.setWorksheet(textDocument, worksheet2),
+      dependencySources
+        .setWorksheet(textDocument.toUri.toASCIIString, worksheet2),
       1,
     )
     assertDiffEqual(
