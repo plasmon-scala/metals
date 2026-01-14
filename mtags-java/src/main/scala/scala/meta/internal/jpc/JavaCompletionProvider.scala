@@ -15,6 +15,7 @@ import scala.jdk.CollectionConverters._
 
 import scala.meta.internal.metals.CompilerVirtualFileParams
 import scala.meta.internal.mtags.CommonMtagsEnrichments._
+import scala.meta.internal.mtags.SourcePath
 import scala.meta.internal.pc.CompletionFuzzy
 import scala.meta.pc.OffsetParams
 
@@ -352,11 +353,14 @@ class JavaCompletionProvider(
   ): List[CompletionItem] = {
     val pkgElement = task.getElements().getPackageOf(pkg.asElement())
     val v = new JavaCompletionSearchVisitor()
-    compiler.search.search(
-      pkgElement.getQualifiedName().toString(),
-      this.compiler.buildTargetId,
-      v
-    )
+    SourcePath.withContext { ctx =>
+      compiler.search.search(
+        pkgElement.getQualifiedName().toString(),
+        this.compiler.buildTargetId,
+        v,
+        ctx.iface
+      )
+    }
     val fuzzyMatches = List.newBuilder[CompletionItem]
     v.visitedFQN.foreach { fqn =>
       val elem = task.getElements().getTypeElement(fqn)

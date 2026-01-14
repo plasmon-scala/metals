@@ -4,6 +4,7 @@ import scala.meta.Dialect
 import scala.meta.internal.mtags
 import scala.meta.internal.mtags.GlobalSymbolIndex
 import scala.meta.internal.mtags.OnDemandSymbolIndex
+import scala.meta.internal.mtags.SourcePath
 import scala.meta.internal.mtags.SymbolDefinition
 import scala.meta.io.AbsolutePath
 
@@ -22,11 +23,10 @@ class DelegatingGlobalSymbolIndex(
     underlying.definition(symbol)
   }
   def addSourceFile(
-      file: AbsolutePath,
-      sourceDirectory: Option[AbsolutePath],
+      file: SourcePath,
       dialect: Dialect
-  ): Option[mtags.IndexingResult] = {
-    underlying.addSourceFile(file, sourceDirectory, dialect)
+  )(implicit ctx: SourcePath.Context): Option[mtags.IndexingResult] = {
+    underlying.addSourceFile(file, dialect)
   }
   def addSourceJar(
       jar: AbsolutePath,
@@ -43,4 +43,8 @@ class DelegatingGlobalSymbolIndex(
     underlying.addSourceDirectory(dir, dialect)
   }
 
+  def findFileForToplevel(
+      topLevelSymbol: mtags.Symbol
+  )(implicit ctx: SourcePath.Context): List[(SourcePath, Dialect)] =
+    underlying.findFileForToplevel(topLevelSymbol)
 }

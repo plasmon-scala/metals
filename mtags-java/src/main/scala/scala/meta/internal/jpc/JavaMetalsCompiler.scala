@@ -20,6 +20,7 @@ import scala.collection.mutable.ListBuffer
 import scala.jdk.CollectionConverters._
 
 import scala.meta.internal.metals.ReportLevel
+import scala.meta.internal.mtags.SourcePath
 import scala.meta.pc.EmbeddedClient
 import scala.meta.pc.JavaFileManagerFactory
 import scala.meta.pc.OffsetParams
@@ -71,7 +72,9 @@ class JavaMetalsCompiler(
     val v = new JavaCompletionSearchVisitor()
     // Allow importing from anywhere, not only the current build target.
     // TODO: Make this configurable?
-    search.search(query, /* buildTargetId= */ "", v)
+    SourcePath.withContext { ctx =>
+      search.search(query, /* buildTargetId= */ "", v, ctx.iface)
+    }
     v.visitedFQN
   }
 

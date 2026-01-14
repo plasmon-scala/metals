@@ -36,6 +36,7 @@ import scala.meta.internal.metals.SimpleTimer
 import scala.meta.internal.mtags.BuildInfo
 import scala.meta.internal.mtags.MD5
 import scala.meta.internal.mtags.MtagsEnrichments._
+import scala.meta.internal.mtags.SourcePath
 import scala.meta.internal.{semanticdb => s}
 import scala.meta.pc.AutoImportsResult
 import scala.meta.pc.CodeActionId
@@ -638,9 +639,11 @@ class ScalaPresentationCompiler(
       "autoImports",
       params.uri.toASCIIString
     ) { pc =>
-      new AutoImportsProvider(pc.compiler(params), name, params)
-        .autoImports()
-        .asJava
+      SourcePath.withContext { implicit ctx =>
+        new AutoImportsProvider(pc.compiler(params), name, params)
+          .autoImports()
+          .asJava
+      }
     }
   }
 

@@ -17,7 +17,8 @@ object EmptySymbolSearch extends SymbolSearch {
   override def search(
       query: String,
       buildTargetIdentifier: String,
-      visitor: SymbolSearchVisitor
+      visitor: SymbolSearchVisitor,
+      ctx: scala.meta.pc.SourcePathContext
   ): SymbolSearch.Result = {
     SymbolSearch.Result.COMPLETE
   }
@@ -26,7 +27,8 @@ object EmptySymbolSearch extends SymbolSearch {
       query: String,
       buildTargetIdentifier: String,
       kind: ju.Optional[MemberKind],
-      visitor: SymbolSearchVisitor
+      visitor: SymbolSearchVisitor,
+      ctx: scala.meta.pc.SourcePathContext
   ): SymbolSearch.Result = {
     SymbolSearch.Result.COMPLETE
   }

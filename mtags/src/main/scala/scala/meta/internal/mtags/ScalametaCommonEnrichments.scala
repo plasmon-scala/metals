@@ -218,6 +218,7 @@ trait ScalametaCommonEnrichments extends CommonMtagsEnrichments {
     else if (filename.endsWith(".proto")) Semanticdb.Language.PROTOBUF
     else Semanticdb.Language.UNKNOWN_LANGUAGE
   }
+
   def filenameToLanguage(filename: String): Language = {
     if (filename.endsWith(".java")) Language.JAVA
     else if (isScalaFilename(filename))
@@ -350,6 +351,23 @@ trait ScalametaCommonEnrichments extends CommonMtagsEnrichments {
     }
   }
 
+  implicit class XtensionSourcePath(path: SourcePath) {
+
+    def toLanguage: Language =
+      filenameToLanguage(path.uri)
+
+    def readTextOpt(implicit ctx: SourcePath.Context): Option[String] = {
+      if (path.exists()) {
+        Option(path.content())
+      } else {
+        None
+      }
+    }
+
+    def toInput(implicit context: SourcePath.Context): Input.VirtualFile =
+      Input.VirtualFile(path.uri, path.content())
+  }
+
   implicit class XtensionAbsolutePath(path: AbsolutePath) {
     def isJar: Boolean = {
       val filename = path.toNIO.getFileName.toString
@@ -471,6 +489,17 @@ trait ScalametaCommonEnrichments extends CommonMtagsEnrichments {
 
     def scalaFileName: String =
       path.filename.stripSuffix(".scala").stripSuffix(".sc")
+
+    def toIdeallyRelativeURI(): Option[String] = {
+      val uri = path.toNIO.toUri
+      if (uri.getScheme == "jar")
+        Option(uri.getRawSchemeSpecificPart).map(_.split("!", 2)).collect {
+          case Array(_, subPath) if subPath.startsWith("/") =>
+            subPath.drop(1)
+        }
+      else
+        None
+    }
 
     def toIdeallyRelativeURI(sourceItemOpt: Option[AbsolutePath]): String =
       sourceItemOpt match {

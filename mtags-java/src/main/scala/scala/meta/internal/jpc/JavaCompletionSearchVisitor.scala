@@ -4,6 +4,7 @@ import java.nio.file.Path
 
 import scala.collection.mutable.ArrayBuffer
 
+import scala.meta.pc.SourcePathContext
 import scala.meta.pc.SymbolSearchVisitor
 
 import org.eclipse.lsp4j
@@ -14,7 +15,11 @@ class JavaCompletionSearchVisitor extends SymbolSearchVisitor {
   def visitedFQN = visited.toSeq
   override def shouldVisitPackage(pkg: String): Boolean = true
   override def isCancelled(): Boolean = false
-  override def visitClassfile(pkg: String, filename: String): Int = {
+  override def visitClassfile(
+      pkg: String,
+      filename: String,
+      ctx: SourcePathContext
+  ): Int = {
     // package-info.class is a special class that is used to store package metadata
     if (filename.contains('$') || filename == "package-info.class") {
       // TODO: handle inner classes

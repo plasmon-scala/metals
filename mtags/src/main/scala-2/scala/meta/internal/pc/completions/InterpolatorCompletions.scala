@@ -4,6 +4,7 @@ import java.lang.StringBuilder
 
 import scala.collection.immutable.Nil
 
+import scala.meta.internal.mtags.SourcePath
 import scala.meta.internal.pc.CompletionFuzzy
 import scala.meta.internal.pc.Identifier
 import scala.meta.internal.pc.InterpolationSplice
@@ -133,31 +134,36 @@ trait InterpolatorCompletions { this: MetalsGlobal =>
     }
 
     override def contribute: List[Member] = {
-      (workspaceSymbolListMembers(interpolator.name, pos) ++
-        metalsScopeMembers(pos)).collect {
-        case s: ScopeMember
-            if CompletionFuzzy.matches(interpolator.name, s.sym.name) =>
-          val filterText = s.sym.getterName.decoded
-          s match {
-            case _: WorkspaceMember =>
-              new WorkspaceInterpolationMember(
-                s.sym,
-                additionalEdits(),
-                newText(s.sym, _),
-                Some(nameRange)
-              )
-            case _ =>
-              val symbolName = s.sym.getterName.decoded
-              val identifier = Identifier.backtickWrap(symbolName)
-              val edit = new l.TextEdit(nameRange, newText(s.sym, identifier))
-              new TextEditMember(
-                filterText,
-                edit,
-                s.sym,
-                additionalTextEdits = additionalEdits()
-              )
-          }
-      }
+      // FIXME Make this context broader?
+      SourcePath
+        .withContext(implicit ctx =>
+          (workspaceSymbolListMembers(interpolator.name, pos)) ++
+            metalsScopeMembers(pos)
+        )
+        .collect {
+          case s: ScopeMember
+              if CompletionFuzzy.matches(interpolator.name, s.sym.name) =>
+            val filterText = s.sym.getterName.decoded
+            s match {
+              case _: WorkspaceMember =>
+                new WorkspaceInterpolationMember(
+                  s.sym,
+                  additionalEdits(),
+                  newText(s.sym, _),
+                  Some(nameRange)
+                )
+              case _ =>
+                val symbolName = s.sym.getterName.decoded
+                val identifier = Identifier.backtickWrap(symbolName)
+                val edit = new l.TextEdit(nameRange, newText(s.sym, identifier))
+                new TextEditMember(
+                  filterText,
+                  edit,
+                  s.sym,
+                  additionalTextEdits = additionalEdits()
+                )
+            }
+        }
     }
   }
 

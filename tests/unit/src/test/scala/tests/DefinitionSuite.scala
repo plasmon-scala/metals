@@ -39,7 +39,7 @@ abstract class DefinitionSuiteBase(
     val index = OnDemandSymbolIndex.empty()
     // Step 1. Index project sources
     input.allFiles.foreach { source =>
-      index.addSourceFile(source.file, Some(source.sourceDirectory), dialect)
+      index.addSourceFile(source.file, dialect)
     }
     // Step 2. Index dependency sources
     index.addSourceJar(JdkSources().right.get, dialect)

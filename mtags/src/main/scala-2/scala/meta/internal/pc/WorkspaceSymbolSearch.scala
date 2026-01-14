@@ -175,7 +175,11 @@ trait WorkspaceSymbolSearch { compiler: MetalsGlobal =>
       }
       added
     }
-    def visitClassfile(pkg: String, filename: String): Int = {
+    def visitClassfile(
+        pkg: String,
+        filename: String,
+        ctx: scala.meta.pc.SourcePathContext
+    ): Int = {
       visit(SymbolSearchCandidate.Classfile(pkg, filename))
     }
     def visitWorkspaceSymbol(

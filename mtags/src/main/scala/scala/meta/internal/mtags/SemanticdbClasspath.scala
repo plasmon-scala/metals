@@ -37,7 +37,7 @@ final case class SemanticdbClasspath(
   }
 
   def textDocument(
-      scalaOrJavaPath: AbsolutePath,
+      scalaOrJavaPath: SourcePath,
       requestInteractive: Boolean = false
   ): TextDocumentLookup = {
     val _ = requestInteractive

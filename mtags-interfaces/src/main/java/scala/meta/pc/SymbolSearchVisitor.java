@@ -28,7 +28,7 @@ public abstract class SymbolSearchVisitor {
    * @param filename the filename of the classfile, formatted as `Outer$Inner.class`
    * @return the number of produced results from this classfile.
    */
-  public abstract int visitClassfile(String pkg, String filename);
+  public abstract int visitClassfile(String pkg, String filename, SourcePathContext ctx);
 
   /**
    * @param path the source file where the symbol is defined.
