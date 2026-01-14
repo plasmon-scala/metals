@@ -35,6 +35,7 @@ import scala.meta.internal.pc.PresentationCompilerConfigImpl
 import scala.meta.pc.AutoImportsResult
 import scala.meta.pc.CodeActionId
 import scala.meta.pc.CompileResult
+import scala.meta.pc.ContentType
 import scala.meta.pc.DefinitionResult
 import scala.meta.pc.DisplayableException
 import scala.meta.pc.EmbeddedClient
@@ -73,7 +74,8 @@ case class JavaPresentationCompiler(
     embedded: EmbeddedClient = EmptyEmbeddedClient,
     ec: ExecutionContextExecutor = ExecutionContext.global,
     sh: Option[ScheduledExecutorService] = None,
-    config: PresentationCompilerConfig = PresentationCompilerConfigImpl(),
+    config: PresentationCompilerConfig =
+      PresentationCompilerConfigImpl(hoverContentType = ContentType.MARKDOWN),
     workspace: Option[Path] = None,
     javaFileManagerFactory: JavaFileManagerFactory =
       JavaFileManagerFactory.EMPTY,
