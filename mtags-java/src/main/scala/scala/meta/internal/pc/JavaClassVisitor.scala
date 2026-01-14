@@ -10,6 +10,7 @@ import scala.meta.pc.SymbolSearchVisitor
 
 import org.eclipse.lsp4j.Range
 import org.eclipse.lsp4j.SymbolKind
+import scala.meta.pc.SourcePathContext
 
 class JavaClassVisitor(elements: Elements, visitMember: Element => Boolean)
     extends SymbolSearchVisitor {
@@ -37,7 +38,11 @@ class JavaClassVisitor(elements: Elements, visitMember: Element => Boolean)
     elements.getPackageElement(toDotPackage(pkg)) != null
   }
 
-  override def visitClassfile(pkg: String, filename: String): Int = {
+  override def visitClassfile(
+      pkg: String,
+      filename: String,
+      ctx: SourcePathContext
+  ): Int = {
     val pkgElem = elements.getPackageElement(toDotPackage(pkg))
     if (pkgElem == null) return 0
 
