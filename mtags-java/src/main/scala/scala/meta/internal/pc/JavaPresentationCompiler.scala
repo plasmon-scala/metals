@@ -16,6 +16,7 @@ import scala.jdk.CollectionConverters._
 import scala.meta.internal.mtags.SourcePath
 import scala.meta.pc.AutoImportsResult
 import scala.meta.pc.CompileResult
+import scala.meta.pc.ContentType
 import scala.meta.pc.DefinitionResult
 import scala.meta.pc.HoverSignature
 import scala.meta.pc.InlayHintsParams
@@ -45,7 +46,8 @@ case class JavaPresentationCompiler(
     search: SymbolSearch = EmptySymbolSearch,
     ec: ExecutionContextExecutor = ExecutionContext.global, // unused?
     sh: Option[ScheduledExecutorService] = None, // unused?
-    config: PresentationCompilerConfig = PresentationCompilerConfigImpl(),
+    config: PresentationCompilerConfig =
+      PresentationCompilerConfigImpl(hoverContentType = ContentType.MARKDOWN),
     workspace: Option[Path] = None // unused?
 ) extends PresentationCompiler {
 
