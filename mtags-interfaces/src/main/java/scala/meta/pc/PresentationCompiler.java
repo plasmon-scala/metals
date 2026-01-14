@@ -313,7 +313,7 @@ public abstract class PresentationCompiler {
    *     better-monadic-for.
    */
   public abstract PresentationCompiler newInstance(
-      String buildTargetIdentifier, List<Path> classpath, List<String> options);
+      String moduleString, List<Path> classpath, List<String> options);
 
   /** Provide workspace root for features like ammonite script $file completions. */
   public abstract PresentationCompiler withWorkspace(Path workspace);

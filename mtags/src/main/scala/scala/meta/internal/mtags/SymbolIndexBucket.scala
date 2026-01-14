@@ -42,6 +42,7 @@ class SymbolIndexBucket(
     onError: PartialFunction[Throwable, Unit],
     isClasspathDefinitionIndexEnabled: () => Boolean,
     javaHome: Path,
+    javaOnly: Boolean,
     toplevels: AtomicTrieMap[String, Set[SourcePath]] = AtomicTrieMap.empty,
     definitions: AtomicTrieMap[String, Set[SymbolLocation]] =
       AtomicTrieMap.empty,
@@ -52,6 +53,22 @@ class SymbolIndexBucket(
   private val classpathDefinitionIndex =
     new ClasspathDefinitionIndex(mtags, dialect)
   private implicit def rc: ReportContext = mtags().rc
+
+  def duplicate(dialect: Dialect, javaOnly: Boolean): SymbolIndexBucket = {
+    assert(this.javaOnly || this.dialect == dialect)
+    new SymbolIndexBucket(
+      mtags = mtags,
+      dialect = dialect,
+      onError = onError,
+      isClasspathDefinitionIndexEnabled = isClasspathDefinitionIndexEnabled,
+      javaHome = javaHome,
+      javaOnly = javaOnly,
+      toplevels = toplevels.duplicate(),
+      definitions = definitions.duplicate(),
+      sourceJars = sourceJars.duplicate(),
+      toIndexSource = toIndexSource
+    )
+  }
 
   def close(): Unit = () // sourceJars.close()
 

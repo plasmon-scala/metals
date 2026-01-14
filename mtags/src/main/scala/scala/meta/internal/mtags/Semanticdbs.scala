@@ -20,15 +20,20 @@ import scala.meta.io.RelativePath
 trait Semanticdbs {
   def textDocument(
       path: SourcePath,
+      module: GlobalSymbolIndex.Module,
       requestInteractive: Boolean = false
   ): TextDocumentLookup
-  final def textDocument(path: AbsolutePath): TextDocumentLookup =
-    textDocument(SourcePath.Standard(path.toNIO))
   final def textDocument(
       path: AbsolutePath,
+      module: GlobalSymbolIndex.Module
+  ): TextDocumentLookup =
+    textDocument(SourcePath.Standard(path.toNIO), module)
+  final def textDocument(
+      path: AbsolutePath,
+      module: GlobalSymbolIndex.Module,
       requestInteractive: Boolean
   ): TextDocumentLookup =
-    textDocument(SourcePath.Standard(path.toNIO), requestInteractive)
+    textDocument(SourcePath.Standard(path.toNIO), module, requestInteractive)
 }
 object Semanticdbs {
 

@@ -38,6 +38,7 @@ final case class SemanticdbClasspath(
 
   def textDocument(
       scalaOrJavaPath: SourcePath,
+      module: GlobalSymbolIndex.Module,
       requestInteractive: Boolean = false
   ): TextDocumentLookup = {
     val _ = requestInteractive

@@ -5,6 +5,7 @@ import java.{util => ju}
 import scala.reflect.internal.util.Position
 
 import scala.meta.internal.jdk.CollectionConverters._
+import scala.meta.internal.mtags.GlobalSymbolIndex
 import scala.meta.internal.mtags.MtagsEnrichments._
 import scala.meta.internal.semanticdb.Scala._
 import scala.meta.pc.DefinitionResult
@@ -16,11 +17,11 @@ import org.eclipse.{lsp4j => l}
 class PcDefinitionProvider(val compiler: MetalsGlobal, params: OffsetParams) {
   import compiler._
 
-  def definition(): DefinitionResult =
-    definition(findTypeDef = false)
+  def definition(module: GlobalSymbolIndex.Module): DefinitionResult =
+    definition(module, findTypeDef = false)
 
-  def typeDefinition(): DefinitionResult =
-    definition(findTypeDef = true)
+  def typeDefinition(module: GlobalSymbolIndex.Module): DefinitionResult =
+    definition(module, findTypeDef = true)
 
   private def typeSymbol(tree: Tree, pos: Position) = {
     val expanded = expandRangeToEnclosingApply(pos)
@@ -58,7 +59,10 @@ class PcDefinitionProvider(val compiler: MetalsGlobal, params: OffsetParams) {
     }
   }
 
-  private def definition(findTypeDef: Boolean): DefinitionResult =
+  private def definition(
+      module: GlobalSymbolIndex.Module,
+      findTypeDef: Boolean
+  ): DefinitionResult =
     if (params.offset() == 0) {
       DefinitionResultImpl.empty
     } else {
@@ -106,7 +110,7 @@ class PcDefinitionProvider(val compiler: MetalsGlobal, params: OffsetParams) {
         val sourceBasedDefs = DefinitionResultImpl(
           semanticdbSymbol(symbol),
           allSyms
-            .flatMap(findDefinitionLocationsForSymbol(unit, _))
+            .flatMap(findDefinitionLocationsForSymbol(module, unit, _))
             .distinct
             .asJava
         )
@@ -181,6 +185,7 @@ class PcDefinitionProvider(val compiler: MetalsGlobal, params: OffsetParams) {
   }
 
   private def findDefinitionLocationsForSymbol(
+      module: GlobalSymbolIndex.Module,
       unit: RichCompilationUnit,
       symbol: Symbol
   ): List[Location] =
@@ -202,7 +207,7 @@ class PcDefinitionProvider(val compiler: MetalsGlobal, params: OffsetParams) {
         .sorted
         .flatMap { sym =>
           if (sym.isGlobal) {
-            search.definition(sym, params.uri()).asScala
+            search.definition(module.asString, sym, params.uri()).asScala
           } else Nil
         }
     }

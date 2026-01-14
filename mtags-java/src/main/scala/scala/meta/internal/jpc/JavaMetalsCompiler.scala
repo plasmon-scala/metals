@@ -216,6 +216,7 @@ class JavaMetalsCompiler(
   ): String = {
     val sym = SemanticdbSymbol.fromElement(element)
     val doc = search.documentation(
+      buildTargetId,
       sym,
       new ParentSymbols {
         override def parents(): ju.List[String] = {

@@ -11,6 +11,7 @@ import scala.meta.Dialect
 import scala.meta.dialects
 import scala.meta.inputs.Input
 import scala.meta.internal.io.{ListFiles => _}
+import scala.meta.internal.metals.ScalaVersions
 import scala.meta.internal.mtags.MtagsEnrichments._
 import scala.meta.io.AbsolutePath
 
@@ -34,7 +35,11 @@ final class OnDemandSymbolIndex(
     isClasspathDefinitionIndexEnabled: () => Boolean,
     val mtags: () => Mtags,
     javaHome: Path,
-    dialectBuckets: TrieMap[Dialect, SymbolIndexBucket] = TrieMap.empty
+    onNewBucket: (SymbolIndexBucket, Dialect, GlobalSymbolIndex.Module) => Unit,
+    dialectBuckets: TrieMap[
+      (Dialect, GlobalSymbolIndex.Module),
+      SymbolIndexBucket
+    ] = TrieMap.empty
 ) extends GlobalSymbolIndex {
   // private lazy val sourceJars0 = sourceJars()
   var indexedSources = 0L
@@ -43,22 +48,45 @@ final class OnDemandSymbolIndex(
   }
   private val onErrorOption = onError.andThen(_ => None)
 
-  private def getOrCreateBucket(dialect: Dialect): SymbolIndexBucket =
-    dialectBuckets.getOrElseUpdate(
-      dialect,
-      new SymbolIndexBucket(
-        mtags = mtags,
-        isClasspathDefinitionIndexEnabled = isClasspathDefinitionIndexEnabled,
-        dialect = dialect,
-        sourceJars = sourceJars(),
-        toIndexSource = toIndexSource,
-        onError = onError,
-        javaHome = javaHome
-      )
+  private def newRootBucket(): SymbolIndexBucket =
+    new SymbolIndexBucket(
+      mtags = mtags,
+      isClasspathDefinitionIndexEnabled = isClasspathDefinitionIndexEnabled,
+      dialect = scala.meta.dialects.Scala213Source3, // unused anyway
+      sourceJars = sourceJars(),
+      toIndexSource = toIndexSource,
+      onError = onError,
+      javaHome = javaHome,
+      javaOnly = true
     )
 
-  override def definition(symbol: Symbol): Option[SymbolDefinition] = {
-    try findSymbolDefinition(symbol).headOption
+  private var rootBucket = newRootBucket()
+
+  def reset(module: GlobalSymbolIndex.Module): Unit =
+    for (((dialect, module0), _) <- dialectBuckets.toList if module0 == module)
+      dialectBuckets.remove((dialect, module))
+  def clear(): Unit = {
+    rootBucket = newRootBucket()
+    dialectBuckets.clear()
+  }
+
+  private def getOrCreateBucket(
+      dialect: Dialect,
+      module: GlobalSymbolIndex.Module
+  ): SymbolIndexBucket =
+    dialectBuckets.getOrElseUpdate(
+      (dialect, module), {
+        val bucket = rootBucket.duplicate(dialect, javaOnly = false)
+        onNewBucket(bucket, dialect, module)
+        bucket
+      }
+    )
+
+  override def definition(
+      module: GlobalSymbolIndex.Module,
+      symbol: Symbol
+  ): Option[SymbolDefinition] = {
+    try findSymbolDefinition(module, symbol).headOption
     catch {
       case NonFatal(e) =>
         onErrorOption(
@@ -67,8 +95,11 @@ final class OnDemandSymbolIndex(
     }
   }
 
-  override def definitions(symbol: Symbol): List[SymbolDefinition] =
-    try findSymbolDefinition(symbol)
+  override def definitions(
+      module: GlobalSymbolIndex.Module,
+      symbol: Symbol
+  ): List[SymbolDefinition] =
+    try findSymbolDefinition(module, symbol)
     catch {
       case NonFatal(e) =>
         onError(new IndexingExceptions.InvalidSymbolException(symbol.value, e))
@@ -76,18 +107,20 @@ final class OnDemandSymbolIndex(
     }
 
   override def addSourceDirectory(
+      module: GlobalSymbolIndex.Module,
       dir: AbsolutePath,
       dialect: Dialect
   ): List[IndexingResult] =
     tryRun(
       dir.toString,
       List.empty,
-      getOrCreateBucket(dialect).addSourceDirectory(dir)
+      getOrCreateBucket(dialect, module).addSourceDirectory(dir)
     )
 
   // Traverses all source files in the given jar file and records
   // all non-trivial toplevel Scala symbols.
   override def addSourceJar(
+      module: GlobalSymbolIndex.Module,
       jar: AbsolutePath,
       dialect: Dialect,
       reindex: Boolean = false
@@ -96,7 +129,7 @@ final class OnDemandSymbolIndex(
       jar.toString,
       List.empty, {
         try {
-          getOrCreateBucket(dialect).addSourceJar(jar, reindex)
+          getOrCreateBucket(dialect, module).addSourceJar(jar, reindex)
         } catch {
           case e: ZipError =>
             onError(new IndexingExceptions.InvalidJarException(jar, e))
@@ -109,20 +142,23 @@ final class OnDemandSymbolIndex(
     )
 
   override def addDependencyModule(
-      module: DependencyModule,
+      module: GlobalSymbolIndex.Module,
+      dependencyModule: DependencyModule,
       dialect: Dialect
   ): List[IndexingResult] = {
+    val jar = dependencyModule.jar
     tryRun(
-      module.jar.toString,
+      jar.toString,
       List.empty, {
         try {
-          getOrCreateBucket(dialect).addDependencyModule(module)
+          getOrCreateBucket(dialect, module)
+            .addDependencyModule(dependencyModule)
         } catch {
           case e: ZipError =>
-            onError(new IndexingExceptions.InvalidJarException(module.jar, e))
+            onError(new IndexingExceptions.InvalidJarException(jar, e))
             List.empty
           case e: ZipException =>
-            onError(new IndexingExceptions.InvalidJarException(module.jar, e))
+            onError(new IndexingExceptions.InvalidJarException(jar, e))
             List.empty
         }
       }
@@ -136,7 +172,7 @@ final class OnDemandSymbolIndex(
       jar.toString,
       List.empty, {
         try {
-          var res = List.empty[IndexingResult]
+          var res = rootBucket.addSourceJar(jar, isPureJava = true)
           for (bucket <- dialectBuckets.values) {
             res = bucket.addSourceJar(jar, isPureJava = true)
           }
@@ -155,23 +191,26 @@ final class OnDemandSymbolIndex(
   // Traverses all source files in the given jar file and returns
   // all non-trivial toplevel Scala symbols.
   def indexSource(
+      module: GlobalSymbolIndex.Module,
       input: Input.VirtualFile,
       dialect: Dialect
   ): IndexingResult =
-    getOrCreateBucket(dialect).indexSource(input, isJava = false)
+    getOrCreateBucket(dialect, module).indexSource(input, isJava = false)
 
   // Used to add cached toplevel symbols to index
   def addIndexedSourceJar(
+      module: GlobalSymbolIndex.Module,
       jar: AbsolutePath,
       symbols: List[(String, SourcePath)],
       dialect: Dialect
   ): Unit = {
-    getOrCreateBucket(dialect).addIndexedSourceJar(jar, symbols)
+    getOrCreateBucket(dialect, module).addIndexedSourceJar(jar, symbols)
   }
 
   // Enters nontrivial toplevel symbols for Scala source files.
   // All other symbols can be inferred on the fly.
   override def addSourceFile(
+      module: GlobalSymbolIndex.Module,
       source: SourcePath,
       dialect: Dialect
   )(implicit ctx: SourcePath.Context): Option[IndexingResult] =
@@ -179,18 +218,19 @@ final class OnDemandSymbolIndex(
       source.uri,
       None, {
         indexedSources += 1
-        getOrCreateBucket(dialect)
+        getOrCreateBucket(dialect, module)
           .addSourceFile(source.toInput, isJava = false)
       }
     )
 
   def addToplevelSymbol(
+      module: GlobalSymbolIndex.Module,
       path: String,
       source: SourcePath,
       toplevel: String,
       dialect: Dialect
   ): Unit =
-    getOrCreateBucket(dialect).addToplevelSymbol(path, source, toplevel)
+    getOrCreateBucket(dialect, module).addToplevelSymbol(path, source, toplevel)
 
   private def tryRun[A](path: String, fallback: => A, thunk: => A): A =
     try thunk
@@ -201,10 +241,25 @@ final class OnDemandSymbolIndex(
     }
 
   private def findSymbolDefinition(
+      module: GlobalSymbolIndex.Module,
       querySymbol: Symbol
   ): List[SymbolDefinition] = {
-    dialectBuckets.values.toList
-      .flatMap(_.query(querySymbol))
+    module match {
+      case s: GlobalSymbolIndex.Standalone =>
+        val dialect = ScalaVersions.dialectForScalaVersion(
+          s.scalaVersion,
+          includeSource3 = true
+        )
+        getOrCreateBucket(dialect, module)
+      case _: GlobalSymbolIndex.BuildTarget =>
+    }
+    dialectBuckets.toList
+      .flatMap { case ((_, module0), bucket) =>
+        if (module == module0)
+          bucket.query(querySymbol)
+        else
+          Nil
+      }
       // prioritize defs where found symbols is exact and comes from scala3
       .sortBy(d => (!d.isExact, d.dialect != dialects.Scala3))
   }
@@ -227,7 +282,12 @@ object OnDemandSymbolIndex {
       mtags: () => Mtags = () => Mtags.testingSingleton,
       sourceJars: () => OpenClassLoader = () => new OpenClassLoader,
       toIndexSource: AbsolutePath => AbsolutePath = identity,
-      isClasspathDefinitionIndexEnabled: () => Boolean = () => false
+      isClasspathDefinitionIndexEnabled: () => Boolean = () => false,
+      onNewBucket: (
+          SymbolIndexBucket,
+          Dialect,
+          GlobalSymbolIndex.Module
+      ) => Unit = (_, _, _) => ()
   ): OnDemandSymbolIndex = {
     new OnDemandSymbolIndex(
       onError,
@@ -235,7 +295,8 @@ object OnDemandSymbolIndex {
       toIndexSource,
       isClasspathDefinitionIndexEnabled,
       mtags = mtags,
-      javaHome = javaHome
+      javaHome = javaHome,
+      onNewBucket = onNewBucket
     )
   }
 

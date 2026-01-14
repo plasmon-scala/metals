@@ -152,7 +152,11 @@ class JavaDefinitionProvider(
           val sym = SemanticdbSymbol.fromElement(firstElement)
           val locations = all.flatMap(e =>
             compiler.search
-              .definition(SemanticdbSymbol.fromElement(e), params.uri())
+              .definition(
+                compiler.buildTargetId,
+                SemanticdbSymbol.fromElement(e),
+                params.uri()
+              )
               .asScala
           )
           DefinitionResultImpl(sym, locations.asJava)
@@ -184,7 +188,10 @@ class JavaDefinitionProvider(
       val symbol = convertImportToSemanticdbSymbol(leafString)
       if (symbol.nonEmpty) try {
         val locations =
-          compiler.search.definition(symbol, params.uri()).asScala.toList
+          compiler.search
+            .definition(compiler.buildTargetId, symbol, params.uri())
+            .asScala
+            .toList
         Some(DefinitionResultImpl(symbol, locations.asJava))
       } catch {
         case NonFatal(

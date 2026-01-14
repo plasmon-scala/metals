@@ -30,7 +30,8 @@ class JavaHoverProvider(
 ) {
 
   def hover(): Option[HoverSignature] = params match {
-    case range: RangeParams => range.trimWhitespaceInRange.flatMap(hoverOffset)
+    case range: RangeParams =>
+      range.trimWhitespaceInRange.flatMap(hoverOffset(_))
     case _ if isWhitespace => None
     case _ => hoverOffset(params)
   }
