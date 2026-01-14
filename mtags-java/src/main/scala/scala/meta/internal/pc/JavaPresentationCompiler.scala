@@ -35,6 +35,7 @@ import org.eclipse.lsp4j.DocumentHighlight
 import org.eclipse.lsp4j.SelectionRange
 import org.eclipse.lsp4j.SignatureHelp
 import org.eclipse.lsp4j.TextEdit
+import scala.meta.internal.mtags.SourcePath
 
 case class JavaPresentationCompiler(
     logger: java.util.function.Consumer[String],
@@ -61,14 +62,16 @@ case class JavaPresentationCompiler(
   override def complete(
       params: OffsetParams
   ): CompletableFuture[CompletionList] =
-    CompletableFuture.completedFuture(
-      new JavaCompletionProvider(
-        javaCompiler,
-        params,
-        config.isCompletionSnippetsEnabled,
-        buildTargetIdentifier
-      ).completions()
-    )
+    CompletableFuture.completedFuture {
+      SourcePath.withContext { implicit ctx =>
+        new JavaCompletionProvider(
+          javaCompiler,
+          params,
+          config.isCompletionSnippetsEnabled,
+          buildTargetIdentifier
+        ).completions()
+      }
+    }
 
   override def completionItemResolve(
       item: CompletionItem,
@@ -153,14 +156,16 @@ case class JavaPresentationCompiler(
       params: OffsetParams,
       isExtension: lang.Boolean
   ): CompletableFuture[util.List[AutoImportsResult]] =
-    CompletableFuture.completedFuture(
-      new JavaAutoImportsProvider(
-        javaCompiler,
-        params,
-        name,
-        buildTargetIdentifier
-      ).autoImports().asJava
-    )
+    CompletableFuture.completedFuture {
+      SourcePath.withContext { implicit ctx =>
+        new JavaAutoImportsProvider(
+          javaCompiler,
+          params,
+          name,
+          buildTargetIdentifier
+        ).autoImports().asJava
+      }
+    }
 
   override def implementAbstractMembers(
       params: OffsetParams

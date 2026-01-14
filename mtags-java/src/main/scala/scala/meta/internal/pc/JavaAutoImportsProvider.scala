@@ -4,6 +4,7 @@ import java.util.Optional
 
 import scala.jdk.CollectionConverters._
 
+import scala.meta.internal.mtags.SourcePath
 import scala.meta.pc.AutoImportsResult
 import scala.meta.pc.OffsetParams
 
@@ -22,7 +23,9 @@ class JavaAutoImportsProvider(
     buildTargetIdentifier: String
 ) {
 
-  def autoImports(): List[AutoImportsResult] = {
+  def autoImports()(implicit
+      ctx: SourcePath.Context
+  ): List[AutoImportsResult] = {
     val task: JavacTask = compiler.compilationTask(params.text(), params.uri())
     val scanner = JavaMetalsGlobal.scanner(task)
     val root: CompilationUnitTree = scanner.root
@@ -62,7 +65,7 @@ class JavaAutoImportsProvider(
       }
     )
 
-    compiler.search.search(name, buildTargetIdentifier, visitor)
+    compiler.search.search(name, buildTargetIdentifier, visitor, ctx.iface)
 
     results.result()
   }
