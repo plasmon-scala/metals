@@ -13,11 +13,32 @@ case class ScalaHover(
     expressionType: Option[String] = None,
     symbolSignature: Option[String] = None,
     docstring: Option[String] = None,
+    codeLanguage: Option[String] = None,
     forceExpressionType: Boolean = false,
     range: Option[lsp4j.Range] = None,
     contextInfo: List[String], // e.g. info about rename imports
     override val contentType: ContentType
 ) extends HoverSignature {
+
+  def this(
+      expressionType: Option[String],
+      symbolSignature: Option[String],
+      docstring: Option[String],
+      forceExpressionType: Boolean,
+      range: Option[lsp4j.Range],
+      contextInfo: List[String],
+      contentType: ContentType
+  ) =
+    this(
+      expressionType = expressionType,
+      symbolSignature = symbolSignature,
+      docstring = docstring,
+      codeLanguage = None,
+      forceExpressionType = forceExpressionType,
+      range = range,
+      contextInfo = contextInfo,
+      contentType = contentType
+    )
 
   def this(
       expressionType: Option[String],
@@ -31,6 +52,7 @@ case class ScalaHover(
       expressionType,
       symbolSignature,
       docstring,
+      None,
       forceExpressionType,
       range,
       contextInfo,
@@ -45,6 +67,7 @@ case class ScalaHover(
         expressionType.getOrElse(""),
         symbolSignature,
         docstring.getOrElse(""),
+        codeLanguage.getOrElse("scala"),
         forceExpressionType,
         contextInfo,
         markdown = contentType == MARKDOWN
@@ -59,6 +82,7 @@ case class ScalaHover(
       expressionType,
       symbolSignature,
       docstring,
+      codeLanguage,
       forceExpressionType,
       Some(range),
       contextInfo,
