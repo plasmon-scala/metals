@@ -18,6 +18,7 @@ object HoverMarkup {
       expressionType: String,
       optSymbolSignature: Option[String],
       docstring: String,
+      codeLanguage: String,
       forceExpressionType: Boolean = false,
       contextInfo: List[String] = Nil,
       markdown: Boolean = true
@@ -36,7 +37,7 @@ object HoverMarkup {
           .append("\n")
       }
       builder
-        .append(if (markdown) "```scala\n" else "")
+        .append(if (markdown) s"```$codeLanguage" + "\n" else "")
         .append(code)
         .append(if (markdown) "\n```" else "\n")
     }
