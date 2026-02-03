@@ -365,8 +365,6 @@ class ScalaToplevelMtags(
           acceptToStatSep()
           loop(indent.notAfterNewline, currRegion, expectTemplate)
         case EXPORT =>
-          if (logger != null)
-            logger.accept(s"Found export $data")
           emitExport(currRegion.owner)
           loop(indent.notAfterNewline, currRegion, expectTemplate)
         case COMMENT =>
