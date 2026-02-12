@@ -5,7 +5,6 @@ import java.nio.CharBuffer
 import scala.util.control.NonFatal
 
 import scala.meta.Dialect
-import scala.meta.internal.io.PlatformFileIO
 import scala.meta.internal.metals.JdkVersion0
 import scala.meta.internal.mtags.MtagsEnrichments._
 import scala.meta.internal.semanticdb.Scala._
@@ -194,7 +193,6 @@ class SymbolIndexBucket(
         }
       }
     }
-    PlatformFileIO.newJarFileSystem(jar, create = false)
   }
 
   /* Sometimes source jars have additional nested directories,
