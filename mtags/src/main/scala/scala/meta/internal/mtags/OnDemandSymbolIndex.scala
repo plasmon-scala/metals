@@ -40,7 +40,7 @@ final class OnDemandSymbolIndex(
     ],
     onError: PartialFunction[Throwable, Unit],
     sourceJars: () => OpenClassLoader,
-    toIndexSource: AbsolutePath => AbsolutePath,
+    toIndexSource: (GlobalSymbolIndex.Module, AbsolutePath) => AbsolutePath,
     javaHome: Path,
     onNewBucket: (
         SymbolIndexBucket,
@@ -329,7 +329,8 @@ object OnDemandSymbolIndex {
         throw e
       },
       sourceJars: () => OpenClassLoader = () => new OpenClassLoader,
-      toIndexSource: AbsolutePath => AbsolutePath = identity,
+      toIndexSource: (GlobalSymbolIndex.Module, AbsolutePath) => AbsolutePath =
+        (_, path) => path,
       onNewBucket: (
           SymbolIndexBucket,
           Option[Dialect],
