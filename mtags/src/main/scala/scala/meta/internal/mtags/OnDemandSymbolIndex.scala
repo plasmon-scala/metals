@@ -39,7 +39,7 @@ final class OnDemandSymbolIndex(
     onError: PartialFunction[Throwable, Unit],
     sourceJars: () => OpenClassLoader,
     toIndexSource: (GlobalSymbolIndex.Module, AbsolutePath) => AbsolutePath,
-    javaHome: Path,
+    val javaHome: Path,
     onNewBucket: (
         SymbolIndexBucket,
         Option[Dialect],
@@ -69,8 +69,8 @@ final class OnDemandSymbolIndex(
     )
   }
 
-  private var rootBucket = newRootBucket()
-  private val dependees =
+  var rootBucket: SymbolIndexBucket = newRootBucket()
+  val dependees =
     new mutable.HashMap[GlobalSymbolIndex.Module, Set[GlobalSymbolIndex.Module]]
 
   def reset(module: GlobalSymbolIndex.Module): Unit =

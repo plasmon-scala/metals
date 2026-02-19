@@ -38,10 +38,10 @@ class SymbolIndexBucket(
     toIndexSource: (GlobalSymbolIndex.Module, AbsolutePath) => AbsolutePath =
       (_, path) => path,
     mtags: Mtags,
-    dialectOpt: Option[Dialect],
+    val dialectOpt: Option[Dialect],
     onError: PartialFunction[Throwable, Unit],
-    javaHome: Path,
-    javaOnly: Boolean,
+    val javaHome: Path,
+    val javaOnly: Boolean,
     addTextDocuments: (
         SymbolIndexBucket,
         Option[Either[AbsolutePath, GlobalSymbolIndex.Module]],
