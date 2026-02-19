@@ -5,6 +5,7 @@ import java.nio.file.Paths
 
 import scala.util.Properties
 
+import scala.meta.Dialect
 import scala.meta.dialects
 import scala.meta.internal.mtags.MD5
 import scala.meta.internal.mtags.MtagsEnrichments._
@@ -47,7 +48,7 @@ class SemanticdbTextDocumentProvider(
     val explicitDialect = if (filePath.isSbt) {
       Some(dialects.Sbt1)
     } else if (filePath.isMill || filePath.isScalaScript) {
-      Some(dialects.Scala213.withAllowToplevelTerms(true))
+      Some(SemanticdbTextDocumentProvider.Scala213WithTopLevelTerms)
     } else {
       None
     }
@@ -72,4 +73,9 @@ class SemanticdbTextDocumentProvider(
       }
       .getOrElse(document)
   }
+}
+
+object SemanticdbTextDocumentProvider {
+  lazy val Scala213WithTopLevelTerms: Dialect =
+    dialects.Scala213.withAllowToplevelTerms(true)
 }

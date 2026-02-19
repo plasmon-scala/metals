@@ -126,7 +126,7 @@ class ScalaVersions(
       case "2.13" if includeSource3 => Scala213Source3
       case "2.13" => Scala213
       case version if version.startsWith("3") =>
-        Scala3.withAllowCaptureChecking(true)
+        ScalaVersions.Scala3WithCaptureChecking
       case _ => Scala213
     }
   }
@@ -198,4 +198,9 @@ object ScalaVersions
       BuildInfo.scala212,
       BuildInfo.scala213,
       BuildInfo.scala3
-    )
+    ) {
+
+  lazy val Scala3WithCaptureChecking: Dialect =
+    Scala3.withAllowCaptureChecking(true)
+
+}
