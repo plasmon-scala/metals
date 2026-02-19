@@ -38,7 +38,10 @@ final class OnDemandSymbolIndex(
     ],
     onError: PartialFunction[Throwable, Unit],
     sourceJars: () => OpenClassLoader,
-    toIndexSource: (GlobalSymbolIndex.Module, AbsolutePath) => AbsolutePath,
+    toIndexSource: (GlobalSymbolIndex.Module, AbsolutePath) => (
+        AbsolutePath,
+        s.Range => Option[s.Range]
+    ),
     val javaHome: Path,
     onNewBucket: (
         SymbolIndexBucket,
@@ -64,8 +67,8 @@ final class OnDemandSymbolIndex(
       onError,
       javaHome,
       javaOnly = true,
-      addTextDocuments = (bucket, origin, path, docs) =>
-        addTextDocuments(bucket, origin, path, docs)
+      addTextDocuments = (bucket, origin, path, docs, convertBackPosition) =>
+        addTextDocuments(bucket, origin, path, docs, convertBackPosition)
     )
   }
 
@@ -279,7 +282,8 @@ final class OnDemandSymbolIndex(
       mainBucket: SymbolIndexBucket,
       originOpt: Option[Either[AbsolutePath, GlobalSymbolIndex.Module]],
       path: SourcePath,
-      docs: s.TextDocuments
+      docs: s.TextDocuments,
+      convertBackPosition: s.Range => Option[s.Range]
   ): Unit = {
     val originOpt0 = path match {
       case z: SourcePath.ZipEntry => Some(Left(z.zipPath))
@@ -309,11 +313,13 @@ final class OnDemandSymbolIndex(
       // we only care about global symbol definitions
       if occ.symbol.isGlobal && occ.role.isDefinition
       bucket <- buckets
-    }
+    } {
+      val loc = SymbolLocation(path, occ.range.flatMap(convertBackPosition))
       bucket.definitions.updateWith(occ.symbol) {
-        case Some(acc) => Some(acc + SymbolLocation(path, occ.range))
-        case None => Some(Set(SymbolLocation(path, occ.range)))
+        case Some(acc) => Some(acc + loc)
+        case None => Some(Set(loc))
       }
+    }
   }
 
 }
@@ -327,8 +333,10 @@ object OnDemandSymbolIndex {
         throw e
       },
       sourceJars: () => OpenClassLoader = () => new OpenClassLoader,
-      toIndexSource: (GlobalSymbolIndex.Module, AbsolutePath) => AbsolutePath =
-        (_, path) => path,
+      toIndexSource: (GlobalSymbolIndex.Module, AbsolutePath) => (
+          AbsolutePath,
+          s.Range => Option[s.Range]
+      ) = (_, path) => (path, Some(_)),
       onNewBucket: (
           SymbolIndexBucket,
           Option[Dialect],

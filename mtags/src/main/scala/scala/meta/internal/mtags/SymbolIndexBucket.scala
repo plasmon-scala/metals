@@ -35,8 +35,10 @@ class SymbolIndexBucket(
     ]],
     val definitions: AtomicTrieMap[String, Set[SymbolLocation]],
     val sourceJars: OpenClassLoader,
-    toIndexSource: (GlobalSymbolIndex.Module, AbsolutePath) => AbsolutePath =
-      (_, path) => path,
+    toIndexSource: (GlobalSymbolIndex.Module, AbsolutePath) => (
+        AbsolutePath,
+        s.Range => Option[s.Range]
+    ) = (_, path) => (path, Some(_)),
     mtags: Mtags,
     val dialectOpt: Option[Dialect],
     onError: PartialFunction[Throwable, Unit],
@@ -46,7 +48,8 @@ class SymbolIndexBucket(
         SymbolIndexBucket,
         Option[Either[AbsolutePath, GlobalSymbolIndex.Module]],
         SourcePath,
-        s.TextDocuments
+        s.TextDocuments,
+        s.Range => Option[s.Range]
     ) => Unit
 ) {
 
@@ -451,28 +454,35 @@ class SymbolIndexBucket(
   private def toIndexInput(
       originOpt: Option[Either[AbsolutePath, GlobalSymbolIndex.Module]],
       input: Input.VirtualFile
-  )(implicit ctx: SourcePath.Context): Input.VirtualFile =
+  )(implicit
+      ctx: SourcePath.Context
+  ): (Input.VirtualFile, s.Range => Option[s.Range]) =
     SourcePath(input.path) match {
       case s: SourcePath.Standard =>
         originOpt match {
           case Some(Right(module)) =>
-            val toIndex = toIndexSource(module, AbsolutePath(s.path))
-            if (toIndex.toNIO == s.path) input
-            else
-              s.copy(path = toIndex.toNIO).toInput
+            val (toIndex, convertBackPosition) =
+              toIndexSource(module, AbsolutePath(s.path))
+            val input0 =
+              if (toIndex.toNIO == s.path) input
+              else
+                s.copy(path = toIndex.toNIO).toInput
+            (input0, convertBackPosition)
           case _ =>
-            input
+            (input, Some(_))
         }
       case _: SourcePath.ZipEntry =>
-        input
+        (input, Some(_))
     }
 
   private def allSymbols(
       originOpt: Option[Either[AbsolutePath, GlobalSymbolIndex.Module]],
       input: Input.VirtualFile
-  )(implicit ctx: SourcePath.Context): s.TextDocument = {
-    val toIndexInput0 = toIndexInput(originOpt, input)
-    mtags.allSymbols(toIndexInput0, dialectOpt)
+  )(implicit
+      ctx: SourcePath.Context
+  ): (s.TextDocument, s.Range => Option[s.Range]) = {
+    val (toIndexInput0, convertBackPosition) = toIndexInput(originOpt, input)
+    (mtags.allSymbols(toIndexInput0, dialectOpt), convertBackPosition)
   }
 
   private def extension(filename: String): String = {
@@ -488,15 +498,24 @@ class SymbolIndexBucket(
       input: Input.VirtualFile,
       retry: Boolean = true
   )(implicit ctx: SourcePath.Context): Unit = try {
-    val docs: s.TextDocuments = extension(input.path) match {
-      case "scala" | "java" | "sc" =>
-        val document = allSymbols(originOpt, input)
-        s.TextDocuments(List(document))
+    val (docs, convertBackPosition)
+        : (s.TextDocuments, s.Range => Option[s.Range]) = extension(
+      input.path
+    ) match {
+      case "scala" | "java" | "sc" | "mill" =>
+        val (document, convertBackPosition) = allSymbols(originOpt, input)
+        (s.TextDocuments(List(document)), convertBackPosition)
       case _ =>
-        s.TextDocuments(Nil)
+        (s.TextDocuments(Nil), Some(_))
     }
     if (docs.documents.nonEmpty)
-      addTextDocuments(this, originOpt, SourcePath(input.path), docs)
+      addTextDocuments(
+        this,
+        originOpt,
+        SourcePath(input.path),
+        docs,
+        convertBackPosition
+      )
   } catch {
     case NonFatal(e) =>
       // pprint.err.log("Error indexing " + input.path)
@@ -586,7 +605,10 @@ object SymbolIndexBucket {
       dialectOpt: Option[Dialect],
       mtags: Mtags,
       sourceJars: OpenClassLoader,
-      toIndexSource: (GlobalSymbolIndex.Module, AbsolutePath) => AbsolutePath,
+      toIndexSource: (GlobalSymbolIndex.Module, AbsolutePath) => (
+          AbsolutePath,
+          s.Range => Option[s.Range]
+      ),
       onError: PartialFunction[Throwable, Unit],
       javaHome: Path,
       javaOnly: Boolean,
@@ -594,7 +616,8 @@ object SymbolIndexBucket {
           SymbolIndexBucket,
           Option[Either[AbsolutePath, GlobalSymbolIndex.Module]],
           SourcePath,
-          s.TextDocuments
+          s.TextDocuments,
+          s.Range => Option[s.Range]
       ) => Unit
   ): SymbolIndexBucket =
     new SymbolIndexBucket(
