@@ -508,6 +508,7 @@ lazy val metals = project
 lazy val `metals-mcp` = project
   .in(file("metals-mcp"))
   .settings(
+    publish / skip := true,
     sharedSettings,
     moduleName := "metals-mcp",
     Compile / mainClass := Some("scala.meta.metals.McpMain"),
