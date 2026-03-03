@@ -50,7 +50,7 @@ class ScalaMtags(
     _toplevelSourceRef match {
       case Some(v) => v
       case None =>
-        val srcName = input.filename.stripSuffix(".scala")
+        val srcName = input.filename.stripSuffix(".mill").stripSuffix(".scala")
         val name = s"$srcName$$package"
         val value = (name, new OverloadDisambiguator())
         _toplevelSourceRef = Some(value)
