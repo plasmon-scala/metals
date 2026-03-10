@@ -262,15 +262,20 @@ final class OnDemandSymbolIndex(
         getOrCreateBucket(Some(dialect), module)
       case _: GlobalSymbolIndex.BuildTarget =>
     }
-    dialectBuckets.toList
-      .flatMap { case ((_, module0), bucket) =>
-        if (module == module0)
-          bucket.query(querySymbol)
-        else
-          Nil
+    val res = dialectBuckets.toList.flatMap { case ((_, module0), bucket) =>
+      if (module == module0)
+        bucket.query(querySymbol)
+      else
+        Nil
+    }
+    // prioritize defs where found symbols is exact and comes from scala3
+    res
+      .groupBy { d =>
+        (!d.isExact, !d.dialectOpt.contains(dialects.Scala3))
       }
-      // prioritize defs where found symbols is exact and comes from scala3
-      .sortBy(d => (!d.isExact, !d.dialectOpt.contains(dialects.Scala3)))
+      .toList
+      .sortBy(_._1)
+      .flatMap(_._2)
   }
 
   def findFileForToplevel(
@@ -318,8 +323,8 @@ final class OnDemandSymbolIndex(
     } {
       val loc = SymbolLocation(path, occ.range.flatMap(convertBackPosition))
       bucket.definitions.updateWith(occ.symbol) {
-        case Some(acc) => Some(acc + loc)
-        case None => Some(Set(loc))
+        case Some(acc) => Some(if (acc.contains(loc)) acc else acc :+ loc)
+        case None => Some(Seq(loc))
       }
     }
   }
