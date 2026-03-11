@@ -285,7 +285,7 @@ class JavaMetalsCompiler(
           // The variable's preferred position still points to its source name.
           if (typeEnd < 0) vt.pos.toLong else typeEnd
         case _ =>
-          originalStart
+          originalStart.toLong
       }
 
       val subText = text.substring(declarationStart.toInt, originalEnd)
