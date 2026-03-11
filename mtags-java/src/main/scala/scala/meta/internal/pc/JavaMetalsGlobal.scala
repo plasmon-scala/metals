@@ -94,7 +94,7 @@ class JavaMetalsGlobal(
         case vt: VariableTree =>
           sourcePositions.getEndPosition(root, vt.getType())
         case _ =>
-          originalStart
+          originalStart.toLong
       }
       val subText = text.substring(declarationStart.toInt, originalEnd)
       val nameIndex = subText.indexOf(elementName)
