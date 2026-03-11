@@ -97,9 +97,9 @@ case class JavaPresentationCompiler(
   override def signatureHelp(
       params: OffsetParams
   ): CompletableFuture[SignatureHelp] =
-    CompletableFuture.completedFuture(
+    run("signatureHelp") {
       new JavaSignatureHelpProvider(javaCompiler, params).signatureHelp()
-    )
+    }
 
   override def hover(
       params: OffsetParams
@@ -126,43 +126,43 @@ case class JavaPresentationCompiler(
       params: OffsetParams,
       name: String
   ): CompletableFuture[util.List[TextEdit]] =
-    CompletableFuture.completedFuture(
+    run("rename") {
       new JavaRenameProvider(javaCompiler, params, Some(name)).rename().asJava
-    )
+    }
 
   override def definition(
       params: OffsetParams
   ): CompletableFuture[DefinitionResult] =
-    CompletableFuture.completedFuture(
+    run("definition") {
       new JavaDefinitionProvider(moduleString, javaCompiler, params)
         .definition()
-    )
+    }
 
   override def typeDefinition(
       params: OffsetParams
   ): CompletableFuture[DefinitionResult] =
-    CompletableFuture.completedFuture(
+    run("typeDefinition") {
       new JavaDefinitionProvider(moduleString, javaCompiler, params)
         .typeDefinition()
-    )
+    }
 
   override def documentHighlight(
       params: OffsetParams
   ): CompletableFuture[util.List[DocumentHighlight]] =
-    CompletableFuture.completedFuture(
+    run("documentHighlight") {
       new JavaDocumentHighlightProvider(javaCompiler, params)
         .documentHighlight()
         .asJava
-    )
+    }
 
   override def references(
       params: ReferencesRequest
   ): CompletableFuture[util.List[ReferencesResult]] =
-    CompletableFuture.completedFuture(
+    run("references") {
       new JavaReferencesProvider(javaCompiler, params)
         .references()
         .asJava
-    )
+    }
 
   override def getTasty(
       targetUri: URI,
@@ -174,7 +174,7 @@ case class JavaPresentationCompiler(
       params: OffsetParams,
       isExtension: lang.Boolean
   ): CompletableFuture[util.List[AutoImportsResult]] =
-    CompletableFuture.completedFuture {
+    run("autoImports") {
       SourcePath.withContext { implicit ctx =>
         new JavaAutoImportsProvider(
           javaCompiler,
