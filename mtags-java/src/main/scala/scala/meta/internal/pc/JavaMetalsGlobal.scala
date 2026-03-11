@@ -580,7 +580,7 @@ object JavaMetalsGlobal {
       .getTask(
         out.orNull,
         fileManager,
-        noopDiagnosticListener,
+        noopDiagnosticListener, // NOPE
         allOptions.asJava,
         null,
         List(javaFileObject).asJava
