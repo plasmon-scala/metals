@@ -437,6 +437,42 @@ class CustomFileManager(
     res
   }
 
+  override def getJavaFileForInput(
+      location: JavaFileManager.Location,
+      className: String,
+      kind: JavaFileObject.Kind
+  ): JavaFileObject =
+    (location, kind) match {
+      case (modLoc: ModuleLocation, JavaFileObject.Kind.CLASS) =>
+        val entryPath = "classes/" + className.replace('.', '/') + ".class"
+        ctx.entries(modLoc.path)
+          .find(_.pathInZip == entryPath)
+          .map(ent => MetalsJavaFileObject(
+            ent.pathInZip.stripPrefix("classes/"),
+            ent.lastModified,
+            modLoc.path,
+            ent.pathInZip.stripPrefix("classes/"),
+            ctx
+          ))
+          .orNull
+      case _ =>
+        super.getJavaFileForInput(location, className, kind)
+    }
+
+  override def getLocationForModule(
+      location: JavaFileManager.Location,
+      moduleName: String
+  ): JavaFileManager.Location =
+    location match {
+      case StandardLocation.SYSTEM_MODULES =>
+        listLocationsForModules(location).asScala
+          .flatMap(_.asScala)
+          .collectFirst { case modLoc: ModuleLocation if modLoc.moduleName == moduleName => modLoc }
+          .orNull
+      case _ =>
+        super.getLocationForModule(location, moduleName)
+  }
+
   override def list(
       location: JavaFileManager.Location,
       packageName: String,
@@ -445,10 +481,16 @@ class CustomFileManager(
   ): JIterable[JavaFileObject] = {
     val res: JIterable[JavaFileObject] = location match {
       case modLoc: ModuleLocation =>
+        val packagePath =
+          if (packageName.isEmpty) ""
+          else packageName.replace('.', '/') + "/"
+        val prefix = s"classes/$packagePath"
         ctx
           .entries(modLoc.path)
-          .filter(ent => ent.pathInZip.startsWith("classes/"))
+          .filter(ent => ent.pathInZip.startsWith(prefix))
           .filter(ent => ent.pathInZip.endsWith(".class"))
+          .filter(ent => !ent.pathInZip.endsWith("/module-info.class") && ent.pathInZip != "classes/module-info.class")
+          .filter(ent => recurse || !ent.pathInZip.stripPrefix(prefix).contains('/'))
           .map { ent =>
             MetalsJavaFileObject(
               ent.pathInZip.stripPrefix("classes/"),
