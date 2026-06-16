@@ -262,8 +262,8 @@ lazy val mtagsShared = project
       "com.google.protobuf" % "protobuf-java" % "4.34.0",
       V.guava,
       "io.get-coursier" % "interface" % V.coursierInterfaces,
-      "com.outr" %% "scribe" % V.scribe,
-      "com.lihaoyi" %% "pprint" % V.pprint,
+      withExcludes("com.outr" %% "scribe" % V.scribe),
+      withExcludes("com.lihaoyi" %% "pprint" % V.pprint),
     ),
     Compile / doc / sources := Seq.empty,
   )
@@ -320,14 +320,14 @@ val mtagsSettings = List(
     scalaVersion.value,
   ),
   libraryDependencies ++= Seq(
-    "com.lihaoyi" %% "geny" % V.genyVersion,
+    withExcludes("com.lihaoyi" %% "geny" % V.genyVersion),
     "com.thoughtworks.qdox" % "qdox" % V.qdox, // for java mtags
     "org.scala-lang.modules" %% "scala-java8-compat" % V.java8Compat,
     "org.jsoup" % "jsoup" % V.jsoup, // for extracting HTML from javadocs
     // for ivy completions
     "io.get-coursier" % "interface" % V.coursierInterfaces,
     "org.lz4" % "lz4-java" % "1.8.1",
-    "com.outr" %% "scribe" % V.scribe,
+    withExcludes("com.outr" %% "scribe" % V.scribe),
   ),
   libraryDependencies ++= {
     crossSetting(
