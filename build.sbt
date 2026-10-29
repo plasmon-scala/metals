@@ -316,6 +316,7 @@ val sharedSettings = sharedScalacOptions ++ List(
       )
     ),
   ),
+  libraryDependencies += "com.lihaoyi" %% "pprint" % V.pprint,
   scalacOptions ++= lintingOptions(scalaVersion.value),
 )
 
@@ -415,6 +416,8 @@ lazy val mtagsShared = project
       "io.get-coursier" % "interface" % V.coursierInterfaces,
       "org.lz4" % "lz4-java" % "1.8.1",
       "org.slf4j" % "slf4j-api" % "1.7.36",
+      withExcludes("com.outr" %% "scribe" % V.scribe),
+      withExcludes("com.lihaoyi" %% "pprint" % V.pprint),
     ),
     libraryDependencies ++= {
       if (isCI) Nil
@@ -480,12 +483,13 @@ val mtagsSettings = List(
   ),
   libraryDependencies ++= Seq(
     "org.ow2.asm" % "asm" % "9.9",
-    "com.lihaoyi" %% "geny" % V.genyVersion,
+    withExcludes("com.lihaoyi" %% "geny" % V.genyVersion),
     "org.scala-lang.modules" %% "scala-java8-compat" % V.java8Compat,
     "org.jsoup" % "jsoup" % V.jsoup, // for extracting HTML from javadocs
     // for ivy completions
     "io.get-coursier" % "interface" % V.coursierInterfaces,
     "org.lz4" % "lz4-java" % "1.8.1",
+    withExcludes("com.outr" %% "scribe" % V.scribe),
   ),
   libraryDependencies ++= {
     crossSetting(
@@ -744,6 +748,7 @@ lazy val metals = project
       "io.undertow" % "undertow-servlet" % "2.3.12.Final",
       // For Twirl
       "org.playframework.twirl" %% "twirl-compiler" % "2.0.9",
+      "com.lihaoyi" %% "os-lib" % "0.9.1",
     ),
     Compile / resourceGenerators += packageJavaHeaderCompiler,
     Compile / resourceGenerators += Def.task {
