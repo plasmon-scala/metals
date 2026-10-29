@@ -224,12 +224,7 @@ val sharedSettings = sharedScalacOptions ++ List(
       )
     ),
   ),
-  libraryDependencies ++= {
-    if (isCI) Nil
-    // NOTE(olafur) pprint is indispensable for me while developing, I can't
-    // use println anymore for debugging because pprint.log is 100 times better.
-    else List("com.lihaoyi" %% "pprint" % V.pprint)
-  },
+  libraryDependencies += "com.lihaoyi" %% "pprint" % V.pprint,
   scalacOptions ++= lintingOptions(scalaVersion.value),
 )
 
@@ -281,6 +276,8 @@ lazy val mtagsShared = project
       "com.google.protobuf" % "protobuf-java" % "4.36.1",
       V.guava,
       "io.get-coursier" % "interface" % V.coursierInterfaces,
+      withExcludes("com.outr" %% "scribe" % V.scribe),
+      withExcludes("com.lihaoyi" %% "pprint" % V.pprint),
     ),
     Compile / doc / sources := Seq.empty,
   )
@@ -337,12 +334,13 @@ val mtagsSettings = List(
     scalaVersion.value,
   ),
   libraryDependencies ++= Seq(
-    "com.lihaoyi" %% "geny" % V.genyVersion,
+    withExcludes("com.lihaoyi" %% "geny" % V.genyVersion),
     "org.scala-lang.modules" %% "scala-java8-compat" % V.java8Compat,
     "org.jsoup" % "jsoup" % V.jsoup, // for extracting HTML from javadocs
     // for ivy completions
     "io.get-coursier" % "interface" % V.coursierInterfaces,
     "org.lz4" % "lz4-java" % "1.8.1",
+    withExcludes("com.outr" %% "scribe" % V.scribe),
   ),
   libraryDependencies ++= {
     crossSetting(
@@ -472,6 +470,7 @@ lazy val metals = project
       "io.undertow" % "undertow-servlet" % "2.3.12.Final",
       // For Twirl
       "org.playframework.twirl" %% "twirl-compiler" % "2.0.9",
+      "com.lihaoyi" %% "os-lib" % "0.9.1",
     ),
     // Force correct version of json-schema-validator for MCP SDK 2.0
     // dependencyOverrides += "com.networknt" % "json-schema-validator" % "2.0.0",
