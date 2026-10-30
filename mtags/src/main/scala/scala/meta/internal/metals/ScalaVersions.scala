@@ -195,7 +195,7 @@ object ScalaVersions
     extends ScalaVersions(
       BuildInfo.supportedScalaVersions,
       BuildInfo.supportedScalaBinaryVersions,
-      BuildInfo.scala212,
+      "2.12.21", // same as V.scala212 in project/V.scala, see ScalaVersionsSuite
       BuildInfo.scala213,
       BuildInfo.scala3
     ) {

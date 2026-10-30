@@ -1,0 +1,218 @@
+//| mill-version: 1.3.1
+//| mill-jvm-version: 17
+
+// Only builds and publishes mtags, the modules it depends on, and mtags-java.
+// Everything else, including tests, is in build.sbt. The versions, dependencies
+// and scalac options here need to be kept in sync with build.sbt and project/V.scala.
+// Do not change mill-jvm-version above, it is the minimal version of Java Metals works with.
+
+import mill.*
+import mill.api.*
+import mill.javalib.publish.*
+import mill.scalalib.*
+import mill.util.Jvm
+
+object V {
+  val scala213 = "2.13.18"
+  val scala3 = "3.3.8"
+
+  val supportedScalaVersions = Seq(scala213, "2.13.16", "2.13.17")
+  val supportedScalaBinaryVersions = Seq("3", "2.13")
+
+  val coursierInterfaces = "1.0.29-M2"
+  val genyVersion = "1.1.1"
+  val guava = "33.7.1-jre"
+  val java8Compat = "1.0.2"
+  val jsoup = "1.23.2"
+  val lsp4j = "1.0.0"
+  val pprint = "0.9.6"
+  val scalameta = "4.17.4"
+  val scribe = "3.19.0"
+}
+
+object Deps {
+  def coursierInterface = mvn"io.get-coursier:interface:${V.coursierInterfaces}"
+  def diffUtils = mvn"com.googlecode.java-diff-utils:diffutils:1.3.0"
+  def geny = mvn"com.lihaoyi::geny:${V.genyVersion}"
+  def guava = mvn"com.google.guava:guava:${V.guava}"
+  def java8Compat =
+    mvn"org.scala-lang.modules::scala-java8-compat:${V.java8Compat}"
+  def jsoup = mvn"org.jsoup:jsoup:${V.jsoup}"
+  def lsp4j = mvn"org.eclipse.lsp4j:org.eclipse.lsp4j:${V.lsp4j}"
+  def lz4 = mvn"org.lz4:lz4-java:1.8.1"
+  def pprint = mvn"com.lihaoyi::pprint:${V.pprint}"
+  def protobuf = mvn"com.google.protobuf:protobuf-java:4.36.1"
+  def scribe = mvn"com.outr::scribe:${V.scribe}"
+  def semanticdbScalacCore =
+    mvn"org.scalameta:::semanticdb-scalac-core:${V.scalameta}"
+}
+
+def withExcludes(dep: Dep): Dep =
+  dep.exclude(
+    "org.scala-lang" -> "scala-reflect",
+    "org.scala-lang" -> "scala-compiler",
+    "org.scala-lang" -> "scala-library",
+    "com.lihaoyi" -> "geny_2.13",
+    "com.lihaoyi" -> "sourcecode_2.13",
+  )
+
+/**
+ * Version of the next release from a released one, like
+ * `1.6.9` -> `1.6.10-SNAPSHOT` or `1.6.9-1` -> `1.6.10-SNAPSHOT`
+ */
+def nextSnapshotVersion(version: String): String =
+  version.split("[.-]").take(3).toSeq match {
+    case Seq(major, minor, patch) if patch.forall(_.isDigit) =>
+      s"$major.$minor.${patch.toInt + 1}-SNAPSHOT"
+    case _ =>
+      sys.error(
+        s"Cannot compute the version following $version, expected an X.Y.Z-like version"
+      )
+  }
+
+/**
+ * The value after the `v` if `HEAD` has a `v*` tag, else the version
+ * following the latest `v*` tag
+ */
+def gitVersion(): String = {
+  def describe(args: String*) =
+    os.proc("git", "describe", "--tags", "--match", "v*", args)
+      .call(cwd = BuildCtx.workspaceRoot, stderr = os.Pipe, check = false)
+  val exactMatch = describe("--exact-match", "HEAD")
+  if (exactMatch.exitCode == 0) exactMatch.out.trim().stripPrefix("v")
+  else {
+    val latest = describe("--abbrev=0")
+    if (latest.exitCode != 0)
+      sys.error(s"No v* tag found: ${latest.err.trim()}")
+    nextSnapshotVersion(latest.out.trim().stripPrefix("v"))
+  }
+}
+
+trait MetalsPublishModule extends PublishModule {
+  def publishVersion = Task.Input(gitVersion())
+
+  // Sonatype Central requires a javadoc JAR, but it doesn't need to have anything in it
+  def docJar = Task {
+    val dest = Task.dest / "out.jar"
+    Jvm.createJar(dest, Nil)
+    PathRef(dest)
+  }
+
+  def pomSettings = PomSettings(
+    description = artifactName(),
+    organization = "io.github.plasmon-scala",
+    url = "https://github.com/plasmon-scala/metals",
+    licenses = Seq(License.`Apache-2.0`),
+    versionControl = VersionControl.github("plasmon-scala", "metals"),
+    developers = Seq(
+      Developer("arthurm1", "arthur McGibbon", "https://github.com/Arthurm1"),
+      Developer("adpi2", "Adrien Piquerez", "https://github.com/adpi2"),
+      Developer("ckipp01", "Chris Kipp", "https://chris-kipp.io"),
+      Developer("gabro", "Gabriele Petronella", "https://github.com/gabro"),
+      Developer("jkciesluk", "Jakub Cieśluk", "https://github.com/jkciesluk"),
+      Developer("kpodsiad", "Kamil Podsiadło", "https://github.com/kpodsiad"),
+      Developer(
+        "kasiaMarek",
+        "Katarzyna Marek",
+        "https://github.com/kasiaMarek",
+      ),
+      Developer("majk-p", "Michał Pawlik", "https://github.com/majk-p"),
+      Developer("olafurpg", "Ólafur Páll Geirsson", "https://geirsson.com"),
+      Developer("tgodzik", "Tomasz Godzik", "https://github.com/tgodzik"),
+      Developer("dos65", "Vadim Chelyshov", "https://github.com/dos65"),
+    ),
+  )
+}
+
+trait MetalsScalaModule extends ScalaModule with MetalsPublishModule {
+  def mvnDeps = Seq(Deps.pprint)
+
+  def scalacOptions = super.scalacOptions() ++ Seq(
+    "-Yrangepos", "-Wunused", "-Xsource:3",
+    // desugaring of for yield caused pattern var to complain
+    // https://github.com/scala/bug/issues/10287
+    "-Wconf:msg=in anonymous function is never used:silent",
+    // silence unused parameters in mtags in abstract methods
+    "-Wconf:src=*.Completions.scala&msg=parameter (member|m) in method (isCandidate|isPrioritized):silent",
+    "-Wconf:src=*.JavacMtags.scala&msg=parameter (ctor|method) in method (visitConstructor|visitMethod):silent",
+    "-Wconf:src=*.MtagsIndexer.scala&msg=parameter owner in method visitOccurrence:silent",
+    "-Wconf:src=*.ScaladocParser.scala&msg=parameter (pos|message) in method reportError:silent",
+    "-Wconf:src=*.CompilerWrapper.scala&msg=parameter params in method compiler is never used:silent",
+    // silence "The outer reference in this type test cannot be checked at run time."
+    "-Wconf:src=.*(CompletionProvider|ArgCompletions|Completions|Keywords|IndentOnPaste).scala&msg=The outer reference:silent",
+  )
+}
+
+/**
+ * The artifacts of these modules have the full Scala version in their
+ * name, and they are published for all supported Scala versions
+ */
+trait MtagsCrossModule extends CrossSbtModule with MetalsScalaModule {
+  def crossFullScalaVersion = Task(true)
+}
+
+object `mtags-interfaces` extends MavenModule with MetalsPublishModule {
+  def mvnDeps = Seq(Deps.lsp4j)
+}
+
+object `mtags-shared` extends Cross[MtagsShared](V.supportedScalaVersions)
+trait MtagsShared extends MtagsCrossModule {
+  def moduleDeps = Seq(`mtags-interfaces`)
+
+  def mvnDeps = super.mvnDeps() ++ Seq(
+    Deps.lz4,
+    Deps.protobuf,
+    Deps.guava,
+    Deps.coursierInterface,
+    withExcludes(Deps.scribe),
+  )
+
+  def scalacOptions =
+    super.scalacOptions() ++ Seq("-release:17", "-target:17")
+}
+
+object mtags extends Cross[Mtags](V.supportedScalaVersions)
+trait Mtags extends MtagsCrossModule {
+  def moduleDeps = Seq(`mtags-shared`())
+
+  def mvnDeps = super.mvnDeps() ++ Seq(
+    withExcludes(Deps.geny),
+    Deps.java8Compat,
+    Deps.jsoup, // for extracting HTML from javadocs
+    Deps.coursierInterface, // for ivy completions
+    Deps.lz4,
+    withExcludes(Deps.scribe),
+    // for token edit-distance used by goto definition
+    Deps.diffUtils,
+    Deps.semanticdbScalacCore,
+  )
+
+  def generatedSources = Task {
+    def strings(values: Seq[String]) =
+      values.map(value => s"\"$value\"").mkString("Seq(", ", ", ")")
+    os.write(
+      Task.dest / "BuildInfo.scala",
+      s"""package scala.meta.internal.mtags
+         |
+         |import scala.collection.immutable.Seq
+         |
+         |case object BuildInfo {
+         |  val scalaCompilerVersion: String = "${scalaVersion()}"
+         |  val supportedScalaVersions: Seq[String] = ${strings(V.supportedScalaVersions)}
+         |  val supportedScalaBinaryVersions: Seq[String] = ${strings(V.supportedScalaBinaryVersions)}
+         |  val scala213: String = "${V.scala213}"
+         |  val scala3: String = "${V.scala3}"
+         |}
+         |""".stripMargin,
+    )
+    Seq(PathRef(Task.dest))
+  }
+}
+
+object `mtags-java` extends SbtModule with MetalsScalaModule {
+  def scalaVersion = V.scala213
+
+  def moduleDeps = Seq(`mtags-interfaces`, `mtags-shared`(V.scala213))
+
+  def mvnDeps = super.mvnDeps() ++ Seq(Deps.java8Compat)
+}
