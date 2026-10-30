@@ -14,6 +14,9 @@ project/plugins/project/
 **/.bloop
 .bsp/
 
+# Mill specific
+/out/
+
 # Scala-IDE specific
 .scala_dependencies
 .worksheet
