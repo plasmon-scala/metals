@@ -217,7 +217,7 @@ class MetalsGlobal(
 
       def hasPackage(pkg: PackageName): Boolean = {
         val dirName =
-          ("classes" +: pkg.dottedString.split('.').filter(_.nonEmpty))
+          ("classes" +: pkg.dottedString.split('.').filterNot(_.isEmpty))
             .mkString("", "/", "/")
         cpIterator().exists(f => fza(f).allDirs.get(dirName) != null)
       }
@@ -230,7 +230,7 @@ class MetalsGlobal(
 
       def packages(inPackage: PackageName): Seq[PackageEntry] = {
         val dirName =
-          ("classes" +: inPackage.dottedString.split('.').filter(_.nonEmpty))
+          ("classes" +: inPackage.dottedString.split('.').filterNot(_.isEmpty))
             .mkString("", "/", "/")
         val prefix =
           if (inPackage.dottedString.isEmpty) ""
@@ -252,7 +252,7 @@ class MetalsGlobal(
       }
       def classes(inPackage: PackageName): Seq[ClassFileEntry] = {
         val dirName =
-          ("classes" +: inPackage.dottedString.split('.').filter(_.nonEmpty))
+          ("classes" +: inPackage.dottedString.split('.').filterNot(_.isEmpty))
             .mkString("", "/", "/")
         cpIterator()
           .flatMap { f =>
@@ -270,7 +270,7 @@ class MetalsGlobal(
       }
       def sources(inPackage: PackageName): Seq[SourceFileEntry] = {
         val dirName =
-          ("classes" +: inPackage.dottedString.split('.').filter(_.nonEmpty))
+          ("classes" +: inPackage.dottedString.split('.').filterNot(_.isEmpty))
             .mkString("", "/", "/")
         val fza0 = fza(srcZip)
         val dirEnt = fza0.allDirs.get(dirName)
