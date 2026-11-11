@@ -17,7 +17,6 @@ package scala.tools.nsc.classpath.metals
 
 import java.net.URL
 
-import scala.collection.immutable.ArraySeq.unsafeWrapArray
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.internal.FatalError
 import scala.reflect.io.AbstractFile
@@ -25,6 +24,8 @@ import scala.tools.nsc.classpath._
 import scala.tools.nsc.util.ClassPath
 import scala.tools.nsc.util.ClassRepresentation
 import scala.tools.nsc.util.EfficientClassPath
+
+import scala.meta.internal.pc.ArrayCompat.unsafeWrapArray
 
 /**
  * A classpath unifying multiple class- and sourcepath entries.

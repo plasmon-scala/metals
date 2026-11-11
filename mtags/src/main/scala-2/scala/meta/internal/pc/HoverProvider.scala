@@ -408,7 +408,7 @@ class HoverProvider(
     // calling flagBitsToString rather than flagString, to drop access stuff, that
     // can't be dropped with just a mask
     val str = sym.flagBitsToString(sym.flags & mask)
-    if (isCase) Seq(str, "case").filter(_.nonEmpty).mkString(" ")
+    if (isCase) Seq(str, "case").filterNot(_.isEmpty).mkString(" ")
     else str
   }
 
