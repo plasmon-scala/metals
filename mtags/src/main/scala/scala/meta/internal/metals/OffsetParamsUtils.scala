@@ -2,6 +2,7 @@ package scala.meta.internal.metals
 
 import java.net.URI
 import java.net.URISyntaxException
+import java.nio.file.FileSystemNotFoundException
 import java.nio.file.Paths
 import java.util.Optional
 
@@ -19,7 +20,10 @@ trait OffsetParamsUtils {
       Paths.get(uri)
       uri
     } catch {
-      case _: IllegalArgumentException | _: URISyntaxException =>
+      // FileSystemNotFoundException: a Windows path with forward slashes, like C:/foo/Bar.scala,
+      // parses as a URI with scheme "C", which no file system provider handles
+      case _: IllegalArgumentException | _: URISyntaxException |
+          _: FileSystemNotFoundException =>
         Paths.get(syntax).toUri
     }
   }
