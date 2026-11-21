@@ -315,6 +315,9 @@ abstract class CompilerAccess[+Reporter, Compiler](
             }
           }
         } catch {
+          case InterruptException() =>
+            // a cancellation, not a compiler failure
+            result.cancel(false)
           case NonFatal(e) =>
             logger.error(s"presentation compiler error ${e.getMessage()}", e)
             result.completeExceptionally(e)
