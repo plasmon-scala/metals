@@ -42,6 +42,7 @@ import scala.{meta => m}
 
 import scala.meta.XtensionSyntax
 import scala.meta.internal.jdk.CollectionConverters._
+import scala.meta.internal.metals.CtSym
 import scala.meta.internal.mtags.Chars
 import scala.meta.internal.mtags.MtagsEnrichments._
 import scala.meta.internal.semanticdb.scalac.SemanticdbOps
@@ -55,6 +56,17 @@ import org.eclipse.{lsp4j => l}
 import org.slf4j.Logger
 
 object MetalsGlobal {
+
+  /**
+   * A directory JDK classes are read from
+   *
+   * @param prefix
+   *   the archive directory, like `classes/` or `MNO/java.base/`
+   * @param classSuffix
+   *   `.class`, or `.sig` for ct.sym
+   */
+  final case class JdkRoot(archive: Path, prefix: String, classSuffix: String)
+
   private val fzaCache = new ConcurrentHashMap[Path, FileZipArchive]
   private def fza(path: Path): FileZipArchive = {
     val valueOrNull = fzaCache.get(path)
@@ -165,10 +177,25 @@ class MetalsGlobal(
   private def actualClassPath(superClassPath: ClassPath): ClassPath = {
     import MetalsGlobal.fza
 
-    val modFiles = settings.classpath.value
+    // The JDK classes, from its .jmod files (under "classes/" in each of them),
+    // or from the class signatures of its lib/ct.sym file (under one
+    // "<releases>/<module>/" directory per module and release set)
+    val jdkRoots: Seq[MetalsGlobal.JdkRoot] = settings.classpath.value
       .split(File.pathSeparator)
-      .filter(_.endsWith(".jmod"))
+      .toSeq
+      .filter(entry => entry.length > 0)
       .map(Paths.get(_))
+      .flatMap { path =>
+        if (path.toString.endsWith(".jmod"))
+          Seq(MetalsGlobal.JdkRoot(path, "classes/", ".class"))
+        else if (CtSym.isCtSym(path))
+          CtSym
+            .layout(path)
+            .prefixes
+            .map(MetalsGlobal.JdkRoot(path, _, CtSym.classSuffix))
+        else
+          Nil
+      }
 
     lazy val modCp: ClassPath = new ClassPath {
       import java.nio.file._
@@ -185,8 +212,11 @@ class MetalsGlobal(
           }
       }
 
+      private lazy val jdkArchives: Seq[Path] =
+        jdkRoots.map(_.archive).distinct
+
       def cpIterator(): Iterator[Path] =
-        modFiles.iterator
+        jdkArchives.iterator
 
       def asClassPathStrings: Seq[String] =
         cpIterator()
@@ -199,29 +229,35 @@ class MetalsGlobal(
           .map(_.toUri.toURL)
           .toVector
 
+      private def packagePath(pkg: String): String =
+        pkg.split('.').filterNot(_.isEmpty).map(_ + "/").mkString
+
+      private def packageDirs(
+          pkg: String
+      ): Iterator[(MetalsGlobal.JdkRoot, FileZipArchive#DirEntry)] = {
+        val path = packagePath(pkg)
+        jdkRoots.iterator.flatMap { root =>
+          val dirEnt = fza(root.archive).allDirs.get(root.prefix + path)
+          if (dirEnt == null) Iterator.empty
+          else Iterator((root, dirEnt))
+        }
+      }
+
       def findClassFile(className: String): Option[AbstractFile] = {
-        val entryName = "classes/" + className.replace(".", "/") + ".class"
-        val idx = entryName.lastIndexOf('/')
-        val dirName = entryName.substring(0, idx + 1)
-        val fileName = entryName.substring(idx + 1)
-        cpIterator()
-          .flatMap { f =>
-            val fza0 = fza(f)
-            val dirEnt = fza0.allDirs.get(dirName)
-            if (dirEnt == null) Iterator.empty
-            else dirEnt.entries.get(fileName).iterator
+        val idx = className.lastIndexOf('.')
+        val pkg = if (idx < 0) "" else className.substring(0, idx)
+        val simpleName = className.substring(idx + 1)
+        packageDirs(pkg)
+          .flatMap { case (root, dirEnt) =>
+            dirEnt.entries.get(simpleName + root.classSuffix).iterator
           }
           .take(1)
           .toList
           .headOption
       }
 
-      def hasPackage(pkg: PackageName): Boolean = {
-        val dirName =
-          ("classes" +: pkg.dottedString.split('.').filterNot(_.isEmpty))
-            .mkString("", "/", "/")
-        cpIterator().exists(f => fza(f).allDirs.get(dirName) != null)
-      }
+      def hasPackage(pkg: PackageName): Boolean =
+        packageDirs(pkg.dottedString).hasNext
 
       def list(inPackage: PackageName): ClassPathEntries =
         ClassPathEntries(
@@ -230,45 +266,28 @@ class MetalsGlobal(
         )
 
       def packages(inPackage: PackageName): Seq[PackageEntry] = {
-        val dirName =
-          ("classes" +: inPackage.dottedString.split('.').filterNot(_.isEmpty))
-            .mkString("", "/", "/")
         val prefix =
           if (inPackage.dottedString.isEmpty) ""
           else inPackage.dottedString + "."
-        cpIterator()
-          .flatMap { f =>
-            val fza0 = fza(f)
-            val dirEnt = fza0.allDirs.get(dirName)
-            if (dirEnt == null) Iterator.empty
-            else
-              dirEnt.entries.valuesIterator
-                .filter(_.isDirectory)
-                .map(e =>
-                  metals.AggregateClassPath.packageEntry(prefix + e.name)
-                )
+        packageDirs(inPackage.dottedString)
+          .flatMap { case (_, dirEnt) =>
+            dirEnt.entries.valuesIterator
+              .filter(_.isDirectory)
+              .map(e => metals.AggregateClassPath.packageEntry(prefix + e.name))
           }
           .toVector
           .distinct
       }
-      def classes(inPackage: PackageName): Seq[ClassFileEntry] = {
-        val dirName =
-          ("classes" +: inPackage.dottedString.split('.').filterNot(_.isEmpty))
-            .mkString("", "/", "/")
-        cpIterator()
-          .flatMap { f =>
-            val fza0 = fza(f)
-            val dirEnt = fza0.allDirs.get(dirName)
-            if (dirEnt == null) Iterator.empty
-            else
-              dirEnt.entries.valuesIterator
-                .filter(!_.isDirectory)
-                .filter(_.name.endsWith(".class"))
-                .map(e => metals.AggregateClassPath.classFileEntry(e))
+      def classes(inPackage: PackageName): Seq[ClassFileEntry] =
+        packageDirs(inPackage.dottedString)
+          .flatMap { case (root, dirEnt) =>
+            dirEnt.entries.valuesIterator
+              .filter(!_.isDirectory)
+              .filter(_.name.endsWith(root.classSuffix))
+              .map(e => metals.AggregateClassPath.classFileEntry(e))
           }
           .toVector
           .distinct
-      }
       def sources(inPackage: PackageName): Seq[SourceFileEntry] = {
         val dirName =
           ("classes" +: inPackage.dottedString.split('.').filterNot(_.isEmpty))
