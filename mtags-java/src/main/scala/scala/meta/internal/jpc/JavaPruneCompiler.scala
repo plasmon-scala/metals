@@ -110,9 +110,12 @@ class JavaPruneCompiler(
     // java.class.path, leaking our own runtime dependencies into the
     // compiled target's classpath.
     // An rt.jar on the class path means we're targeting a Java 8 JDK, whose
-    // classes are passed via -bootclasspath
+    // classes are passed via -bootclasspath. The JDK classes of .jmod / ct.sym
+    // files come from the file manager, as system modules.
     val (bootClassPath, userClassPath) =
-      classpath.partition(_.getFileName.toString == "rt.jar")
+      classpath
+        .filterNot(CustomFileManager.isJdkClassFile)
+        .partition(_.getFileName.toString == "rt.jar")
     val hasVersionOption = processedExtraOptions.exists { opt =>
       JavaPruneCompiler.versionOptions(opt) || opt.startsWith("--release=")
     }
