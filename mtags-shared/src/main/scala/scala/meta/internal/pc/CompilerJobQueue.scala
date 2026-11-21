@@ -178,6 +178,9 @@ object CompilerJobQueue {
               override def run(): Unit =
                 try super.run()
                 catch {
+                  case InterruptException() =>
+                    // a cancellation, not worth a stack trace
+                    scribe.debug("Compiler job cancelled")
                   case t: Throwable =>
                     scribe.error("Compiler thread error", t)
                     if (userLogger != null) {

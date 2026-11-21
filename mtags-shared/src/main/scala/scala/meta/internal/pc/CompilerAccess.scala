@@ -259,12 +259,25 @@ abstract class CompilerAccess[+Reporter, Compiler](
       uri,
       result,
       { () =>
-        token.checkCanceled()
-        Thread.interrupted() // clear interrupt bit
-        val id = UUID.randomUUID().toString
-        beforeAccess0.foreach(_(id, name, uri))
-        try result.complete(thunk())
-        finally afterAccess0.foreach(_(id, name, uri))
+        // A request cancelled before its job got to run (the token.onCancel callback below
+        // cancels result too, but some time later): cancel it here rather than let the
+        // exception of checkCanceled end the queue thread, which reports it as an error
+        val cancelled =
+          try {
+            token.checkCanceled()
+            false
+          } catch {
+            case InterruptException() => true
+          }
+        if (cancelled)
+          result.cancel(false)
+        else {
+          Thread.interrupted() // clear interrupt bit
+          val id = UUID.randomUUID().toString
+          beforeAccess0.foreach(_(id, name, uri))
+          try result.complete(thunk())
+          finally afterAccess0.foreach(_(id, name, uri))
+        }
         ()
       }
     )
