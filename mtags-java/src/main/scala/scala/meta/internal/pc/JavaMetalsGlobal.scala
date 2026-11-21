@@ -30,6 +30,7 @@ import scala.annotation.tailrec
 import scala.jdk.CollectionConverters._
 import scala.util.Using
 
+import scala.meta.internal.metals.CtSym
 import scala.meta.internal.mtags.CommonMtagsEnrichments._
 import scala.meta.internal.mtags.SourcePath
 import scala.meta.pc.ContentType
@@ -119,15 +120,18 @@ class JavaMetalsGlobal(
   def compilationTask(sourceCode: String, uri: URI): JavacTask = {
     val javaFileObject = SourceJavaFileObject.make(sourceCode, uri)
     // kind of meh, but does the job
+    // The JDK classes of .jmod / ct.sym files come from the file manager, as system modules
     val (bootClassPath, userClassPath) =
-      classpath.partition(_.getFileName.toString == "rt.jar")
+      classpath
+        .filterNot(CustomFileManager.isJdkClassFile)
+        .partition(_.getFileName.toString == "rt.jar")
     val javaVersion = if (bootClassPath.isEmpty) "17" else "1.8"
 
     val javaVersionOptions =
       List("--source", javaVersion, "--target", javaVersion)
     val classPathOptions =
       if (bootClassPath.isEmpty)
-        List("-classpath", classpath.mkString(File.pathSeparator))
+        List("-classpath", userClassPath.mkString(File.pathSeparator))
       else
         List(
           s"-bootclasspath",
@@ -330,9 +334,20 @@ class JavaMetalsGlobal(
 
 }
 
+/**
+ * A module of the JDK, whose classes are read from an archive
+ *
+ * @param prefixes
+ *   the archive entry prefixes the classes of the module are under: `classes/`
+ *   in `.jmod` files, `<releases>/<module>/` in ct.sym (see [[CtSym]])
+ * @param classSuffix
+ *   the suffix of class entries: `.class` in `.jmod` files, `.sig` in ct.sym
+ */
 case class ModuleLocation(
     moduleName: String,
-    path: Path
+    path: Path,
+    prefixes: Seq[String],
+    classSuffix: String
 ) extends JavaFileManager.Location {
   override def getName(): String =
     toString
@@ -340,11 +355,39 @@ case class ModuleLocation(
     false
 }
 
+object ModuleLocation {
+  def jmod(jmod: Path): ModuleLocation =
+    ModuleLocation(
+      jmod.getFileName.toString.stripSuffix(".jmod"),
+      jmod,
+      Seq("classes/"),
+      ".class"
+    )
+  def ctSym(ctSym: Path): Seq[ModuleLocation] =
+    CtSym
+      .layout(ctSym)
+      .modules
+      .toVector
+      .sortBy(_._1)
+      .map { case (module, prefixes) =>
+        ModuleLocation(module, ctSym, prefixes, CtSym.classSuffix)
+      }
+}
+
+/**
+ * @param entryName
+ *   path of the class file relative to its module, like
+ *   `java/lang/String.class` (also for ct.sym signatures)
+ * @param actualEntryName
+ *   the name of the entry in the archive, like
+ *   `classes/java/lang/String.class` or `MNO/java.base/java/lang/String.sig`
+ */
 case class MetalsJavaFileObject(
     name: String,
     lastModified: Long,
     path: Path,
     entryName: String,
+    actualEntryName: String,
     ctx: SourcePath.Context
 ) extends javax.tools.JavaFileObject {
   def getKind = javax.tools.JavaFileObject.Kind.CLASS
@@ -357,9 +400,6 @@ case class MetalsJavaFileObject(
     kind == javax.tools.JavaFileObject.Kind.CLASS
   def getAccessLevel(): javax.lang.model.element.Modifier = null
   def getNestingKind(): javax.lang.model.element.NestingKind = null
-
-  private def actualEntryName =
-    s"classes/$entryName"
 
   def getName(): String = name
   def toUri(): java.net.URI =
@@ -385,57 +425,113 @@ case class MetalsJavaFileObject(
   def openOutputStream(): java.io.OutputStream = ???
 }
 
+/**
+ * A file manager reading the JDK system modules from `jdkClassFiles`, rather
+ * than from the JDK javac runs on
+ *
+ * @param jdkClassFiles
+ *   the `.jmod` files of the JDK, or its `lib/ct.sym` file (whose class
+ *   signatures for the JDK's own release are used then)
+ */
 class CustomFileManager(
-    javaHome: Path,
+    jdkClassFiles: Seq[Path],
     underlying: javax.tools.JavaFileManager,
     ctx: SourcePath.Context
 ) extends ForwardingJavaFileManager(underlying) {
 
-  private val modsCache = new ju.concurrent.ConcurrentHashMap[Path, JIterable[
-    ju.Set[JavaFileManager.Location]
-  ]]
+  /** Reads the `.jmod` files of `javaHome` */
+  def this(
+      javaHome: Path,
+      underlying: javax.tools.JavaFileManager,
+      ctx: SourcePath.Context
+  ) =
+    this(CustomFileManager.jmodFiles(javaHome), underlying, ctx)
 
-  def resetCache(): Unit =
-    modsCache.clear()
+  @volatile private var modsCache: JIterable[ju.Set[JavaFileManager.Location]] =
+    null
+
+  private val moduleEntriesCache =
+    new ju.concurrent.ConcurrentHashMap[ModuleLocation, Vector[
+      CustomFileManager.ModuleEntry
+    ]]
+
+  def resetCache(): Unit = {
+    modsCache = null
+    moduleEntriesCache.clear()
+  }
+
+  private def systemModules: JIterable[ju.Set[JavaFileManager.Location]] = {
+    val valueOrNull = modsCache
+    if (valueOrNull == null) {
+      val mods = jdkClassFiles
+        .filter(Files.isRegularFile(_))
+        .flatMap { f =>
+          if (CtSym.isCtSym(f)) ModuleLocation.ctSym(f)
+          else if (f.getFileName.toString.endsWith(".jmod"))
+            Seq(ModuleLocation.jmod(f))
+          else Nil
+        }
+        .map(loc => loc: JavaFileManager.Location)
+        .toSet
+      val mods0 = List(mods.asJava).asJava
+      modsCache = mods0
+      mods0
+    } else
+      valueOrNull
+  }
+
+  private def moduleEntries(
+      modLoc: ModuleLocation
+  ): Vector[CustomFileManager.ModuleEntry] = {
+    val valueOrNull = moduleEntriesCache.get(modLoc)
+    if (valueOrNull == null) {
+      val entries = ctx
+        .entries(modLoc.path)
+        .flatMap { ent =>
+          val name = ent.pathInZip
+          if (name.endsWith(modLoc.classSuffix))
+            modLoc.prefixes.collectFirst {
+              case prefix if name.startsWith(prefix) =>
+                CustomFileManager.ModuleEntry(
+                  name
+                    .substring(prefix.length)
+                    .stripSuffix(modLoc.classSuffix) + ".class",
+                  name,
+                  ent.lastModified
+                )
+            }
+          else None
+        }
+        .toVector
+      val previousOrNull = moduleEntriesCache.putIfAbsent(modLoc, entries)
+      if (previousOrNull == null) entries
+      else previousOrNull
+    } else
+      valueOrNull
+  }
+
+  private def fileObject(
+      modLoc: ModuleLocation,
+      entry: CustomFileManager.ModuleEntry
+  ): MetalsJavaFileObject =
+    MetalsJavaFileObject(
+      entry.relPath,
+      entry.lastModified,
+      modLoc.path,
+      entry.relPath,
+      entry.entryName,
+      ctx
+    )
 
   override def listLocationsForModules(
       location: JavaFileManager.Location
-  ): JIterable[ju.Set[JavaFileManager.Location]] = {
-    val res = location match {
+  ): JIterable[ju.Set[JavaFileManager.Location]] =
+    location match {
       case StandardLocation.SYSTEM_MODULES =>
-        val valueOrNull = modsCache.get(javaHome)
-        if (valueOrNull == null) {
-          val jmodsDir = javaHome.resolve("jmods")
-          val mods =
-            if (Files.isDirectory(jmodsDir))
-              Using.resource(Files.list(jmodsDir)) { list =>
-                list
-                  .iterator()
-                  .asScala
-                  .filter(_.toString.endsWith(".jmod"))
-                  .filter(Files.isRegularFile(_))
-                  .map(jmod =>
-                    ModuleLocation(
-                      jmod.getFileName.toString.stripSuffix(".jmod"),
-                      jmod
-                    ): JavaFileManager.Location
-                  )
-                  .toSet
-              }
-            else
-              Set.empty[JavaFileManager.Location]
-          val mods0 = List(mods.asJava).asJava
-          val prevOrNull = modsCache.putIfAbsent(javaHome, mods0)
-          if (prevOrNull == null) mods0
-          else prevOrNull
-        } else
-          valueOrNull
+        systemModules
       case _ =>
         super.listLocationsForModules(location)
     }
-    // scribe.info(s"JavaFileManager.listLocationsForModules($location) = " + pprint.apply(res.asScala.map(_.asScala)))
-    res
-  }
 
   override def getJavaFileForInput(
       location: JavaFileManager.Location,
@@ -444,19 +540,10 @@ class CustomFileManager(
   ): JavaFileObject =
     (location, kind) match {
       case (modLoc: ModuleLocation, JavaFileObject.Kind.CLASS) =>
-        val entryPath = "classes/" + className.replace('.', '/') + ".class"
-        ctx
-          .entries(modLoc.path)
-          .find(_.pathInZip == entryPath)
-          .map(ent =>
-            MetalsJavaFileObject(
-              ent.pathInZip.stripPrefix("classes/"),
-              ent.lastModified,
-              modLoc.path,
-              ent.pathInZip.stripPrefix("classes/"),
-              ctx
-            )
-          )
+        val relPath = className.replace('.', '/') + ".class"
+        moduleEntries(modLoc)
+          .find(_.relPath == relPath)
+          .map(fileObject(modLoc, _))
           .orNull
       case _ =>
         super.getJavaFileForInput(location, className, kind)
@@ -484,73 +571,83 @@ class CustomFileManager(
       packageName: String,
       kinds: ju.Set[JavaFileObject.Kind],
       recurse: Boolean
-  ): JIterable[JavaFileObject] = {
-    val res: JIterable[JavaFileObject] = location match {
+  ): JIterable[JavaFileObject] =
+    location match {
       case modLoc: ModuleLocation =>
-        val packagePath =
+        val prefix =
           if (packageName.isEmpty) ""
           else packageName.replace('.', '/') + "/"
-        val prefix = s"classes/$packagePath"
-        ctx
-          .entries(modLoc.path)
-          .filter(ent => ent.pathInZip.startsWith(prefix))
-          .filter(ent => ent.pathInZip.endsWith(".class"))
+        moduleEntries(modLoc)
+          .filter(ent => ent.relPath.startsWith(prefix))
           .filter(ent =>
-            !ent.pathInZip.endsWith(
+            !ent.relPath.endsWith(
               "/module-info.class"
-            ) && ent.pathInZip != "classes/module-info.class"
+            ) && ent.relPath != "module-info.class"
           )
           .filter(ent =>
-            recurse || !ent.pathInZip.stripPrefix(prefix).contains('/')
+            recurse || !ent.relPath.substring(prefix.length).contains('/')
           )
-          .map { ent =>
-            MetalsJavaFileObject(
-              ent.pathInZip.stripPrefix("classes/"),
-              ent.lastModified,
-              modLoc.path,
-              ent.pathInZip.stripPrefix("classes/"),
-              ctx
-            ): javax.tools.JavaFileObject
-          }
+          .map(fileObject(modLoc, _): javax.tools.JavaFileObject)
           .toList
           .asJava
       case _ =>
-        val res0 = super.list(location, packageName, kinds, recurse)
-        // scribe.info(s"JavaFileManager.list($location (${location.getClass}), $packageName, $kinds, $recurse) = " + pprint.apply(res0.asScala))
-        res0
+        super.list(location, packageName, kinds, recurse)
     }
-    res
-  }
 
-  override def inferModuleName(location: JavaFileManager.Location): String = {
-    val res = location match {
+  override def inferModuleName(location: JavaFileManager.Location): String =
+    location match {
       case modLoc: ModuleLocation =>
         modLoc.moduleName
       case _ =>
-        val res0 = super.inferModuleName(location)
-        // scribe.info(s"JavaFileManager.inferModuleName($location) = " + pprint.apply(res0))
-        res0
+        super.inferModuleName(location)
     }
-    // scribe.info(s"inferModuleName($location) = " + pprint.apply(res))
-    res
-  }
 
   override def inferBinaryName(
       location: JavaFileManager.Location,
       fileObj: JavaFileObject
-  ): String = {
-    val res = (location, fileObj) match {
+  ): String =
+    (location, fileObj) match {
       case (_: ModuleLocation, obj: MetalsJavaFileObject)
           if obj.entryName.endsWith(".class") =>
         obj.entryName.stripSuffix(".class").split('/').mkString(".")
       case _ =>
-        val res0 = super.inferBinaryName(location, fileObj)
-        res0
+        super.inferBinaryName(location, fileObj)
     }
-    // scribe.info(s"inferBinaryName($location, $fileObj) = " + pprint.apply(res))
-    res
+
+}
+
+object CustomFileManager {
+
+  /**
+   * @param relPath
+   *   path of the class relative to its module, like `java/lang/String.class`
+   * @param entryName
+   *   name of the archive entry
+   */
+  final case class ModuleEntry(
+      relPath: String,
+      entryName: String,
+      lastModified: Long
+  )
+
+  def jmodFiles(javaHome: Path): Seq[Path] = {
+    val jmodsDir = javaHome.resolve("jmods")
+    if (Files.isDirectory(jmodsDir))
+      Using.resource(Files.list(jmodsDir)) { list =>
+        list
+          .iterator()
+          .asScala
+          .filter(_.toString.endsWith(".jmod"))
+          .filter(Files.isRegularFile(_))
+          .toVector
+      }
+    else
+      Nil
   }
 
+  /** Whether a class path entry is one of the JDK files the file manager reads */
+  def isJdkClassFile(path: Path): Boolean =
+    CtSym.isCtSym(path) || path.getFileName.toString.endsWith(".jmod")
 }
 
 object JavaMetalsGlobal {

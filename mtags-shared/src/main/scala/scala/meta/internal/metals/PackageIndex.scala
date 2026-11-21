@@ -39,6 +39,8 @@ class PackageIndex() {
             isMod = true,
             isExcludedPackage = isExcludedPackage
           )
+        else if (Files.isRegularFile(entry) && CtSym.isCtSym(entry))
+          visitCtSym(entry)
       } catch {
         case NonFatal(e) =>
           logger.log(Level.SEVERE, entry.toURI.toString, e)
@@ -128,6 +130,26 @@ class PackageIndex() {
     }
   }
 
+  /** Indexes the class signatures of the JDK's own release in a ct.sym file */
+  private def visitCtSym(ctSym: Path): Unit = {
+    val layout = CtSym.layout(ctSym)
+    val jar = new JarFile(ctSym.toFile)
+    try {
+      val entries = jar.entries()
+      while (entries.hasMoreElements) {
+        val element = entries.nextElement()
+        if (!element.isDirectory && element.getName.endsWith(CtSym.classSuffix))
+          for (relPath <- layout.relativePath(element.getName)) {
+            val name =
+              relPath.stripSuffix(CtSym.classSuffix) + ".class"
+            addMember(dirname(name), basename(name))
+          }
+      }
+    } finally {
+      jar.close()
+    }
+  }
+
   private def visitJarEntry(
       jarpath: Path,
       isMod: Boolean = false,
@@ -190,17 +212,22 @@ class PackageIndex() {
   ): Unit = {
 
     val modsDir = javaHome.resolve("jmods")
-    val modFiles = Files
-      .list(modsDir)
-      .iterator()
-      .asScala
-      // case-insensitive comparison?
-      .filter(_.getFileName.toString.endsWith(".jmod"))
-      .filter(Files.isRegularFile(_))
-      .toVector
+    val ctSym = javaHome.resolve("lib/ct.sym")
+    if (Files.isDirectory(modsDir)) {
+      val modFiles = Files
+        .list(modsDir)
+        .iterator()
+        .asScala
+        // case-insensitive comparison?
+        .filter(_.getFileName.toString.endsWith(".jmod"))
+        .filter(Files.isRegularFile(_))
+        .toVector
 
-    for (modFile <- modFiles)
-      visit(modFile, isExcludedPackage)
+      for (modFile <- modFiles)
+        visit(modFile, isExcludedPackage)
+    } else if (Files.isRegularFile(ctSym))
+      // JDKs built without JMODs (JEP 493)
+      visit(ctSym, isExcludedPackage)
   }
 
 }
