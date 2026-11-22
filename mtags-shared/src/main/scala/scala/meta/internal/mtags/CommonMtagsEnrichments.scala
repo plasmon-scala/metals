@@ -282,6 +282,9 @@ trait CommonMtagsEnrichments {
       else if (isJavaFilename) Semanticdb.Language.JAVA
       else if (isProtoFilename) Semanticdb.Language.PROTOBUF
       else Semanticdb.Language.UNKNOWN_LANGUAGE
+    // still used by the Scala 3 presentation compiler
+    def isAmmoniteGeneratedFile: Boolean =
+      doc.endsWith(".amm.sc.scala")
     def isScalaCLIGeneratedFile: Boolean =
       doc.endsWith(".sc.scala")
     def isMill: Boolean =
