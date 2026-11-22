@@ -188,7 +188,7 @@ public class MetalsJavaHeaderCompilerPlugin implements Plugin {
         } else {
           List<JCStatement> statements = methodDecl.body.stats;
           methodDecl.body.stats =
-              statements.nonEmpty() && TreeInfo.isSelfCall(statements.head)
+              statements.nonEmpty() && isSelfCall(statements.head)
                   ? List.of(statements.head)
                   : List.nil();
         }
@@ -506,6 +506,17 @@ public class MetalsJavaHeaderCompilerPlugin implements Plugin {
         }
       }
       return result;
+    }
+
+    // Whether the statement is a this(...) or super(...) call. Not TreeInfo.isSelfCall, which
+    // JDK 22 removed: this plugin runs in the javac of whatever JDK runs the presentation compiler.
+    private static boolean isSelfCall(JCStatement statement) {
+      if (statement instanceof JCExpressionStatement exprStatement
+          && exprStatement.expr instanceof JCMethodInvocation invocation) {
+        Name name = TreeInfo.name(invocation.meth);
+        return name != null && (name.contentEquals("this") || name.contentEquals("super"));
+      }
+      return false;
     }
 
     private Name findFirstEnumConstant(JCClassDecl enumDecl) {
