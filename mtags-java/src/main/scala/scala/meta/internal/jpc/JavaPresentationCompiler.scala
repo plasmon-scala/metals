@@ -26,8 +26,10 @@ import scala.meta.internal.metals.PcQueryContext
 import scala.meta.internal.metals.ReportContext
 import scala.meta.internal.metals.ReportLevel
 import scala.meta.internal.metals.StdReportContext
+import scala.meta.internal.pc.CompilerAccess
 import scala.meta.internal.pc.DefinitionResultImpl
 import scala.meta.internal.pc.EmptySymbolSearch
+import scala.meta.internal.pc.HasCompilerAccess
 import scala.meta.internal.pc.JavaDocumentHighlightProvider
 import scala.meta.internal.pc.JavaReferencesProvider
 import scala.meta.internal.pc.JavaRenameProvider
@@ -82,11 +84,17 @@ case class JavaPresentationCompiler(
     logger: Logger = LoggerFactory.getLogger("mtags"),
     reportsLevel: ReportLevel = ReportLevel.Info,
     progressBars: ProgressBars = ProgressBars.EMPTY
-) extends PresentationCompiler {
+) extends PresentationCompiler
+    with HasCompilerAccess {
 
   override def isJava(): Boolean = true
 
   override def supportsBatchSemanticdbTextDocuments(): Boolean = true
+
+  def compilerAccess: CompilerAccess[_, _] = compiler
+
+  def latestException(): Option[(Option[String], Throwable)] =
+    compiler.latestExceptionOpt
 
   private val compiler = new JavaPresentationCompilerAccess(
     logger,
@@ -129,11 +137,16 @@ case class JavaPresentationCompiler(
       EmptyCancelToken
     )
 
-  private def request[T](params: VirtualFileParams, default: T)(
+  private def request[T](params: VirtualFileParams, default: T, name: String)(
       f: JavaMetalsCompiler => T
   ): CompletableFuture[T] = {
     lastParams = params
-    compiler.withInterruptableCompiler(default, params.token()) { pc =>
+    compiler.withInterruptableCompiler(
+      default,
+      params.token(),
+      name,
+      params.uri().toASCIIString
+    ) { pc =>
       f(pc.compiler())
     }(params.toQueryContext)
   }
@@ -141,7 +154,7 @@ case class JavaPresentationCompiler(
   override def complete(
       params: OffsetParams
   ): CompletableFuture[CompletionList] =
-    request(params, new CompletionList()) { pc =>
+    request(params, new CompletionList(), "complete") { pc =>
       new JavaCompletionProvider(
         pc,
         params,
@@ -158,7 +171,7 @@ case class JavaPresentationCompiler(
   override def signatureHelp(
       params: OffsetParams
   ): CompletableFuture[SignatureHelp] =
-    request(params, new SignatureHelp()) { pc =>
+    request(params, new SignatureHelp(), "signatureHelp") { pc =>
       new JavaSignatureHelpProvider(
         pc,
         params,
@@ -169,15 +182,16 @@ case class JavaPresentationCompiler(
   override def semanticTokens(
       params: VirtualFileParams
   ): CompletableFuture[util.List[Node]] = {
-    request(params, util.Collections.emptyList[Node]()) { pc =>
-      new JavaSemanticTokensProvider(pc, params).semanticTokens()
+    request(params, util.Collections.emptyList[Node](), "semanticTokens") {
+      pc =>
+        new JavaSemanticTokensProvider(pc, params).semanticTokens()
     }
   }
 
   override def hover(
       params: OffsetParams
   ): CompletableFuture[Optional[HoverSignature]] =
-    request(params, Optional.empty[HoverSignature]()) { pc =>
+    request(params, Optional.empty[HoverSignature](), "hover") { pc =>
       Optional.ofNullable(
         new JavaHoverProvider(pc, params, config.hoverContentType())
           .hover()
@@ -195,14 +209,14 @@ case class JavaPresentationCompiler(
       params: OffsetParams,
       name: String
   ): CompletableFuture[util.List[TextEdit]] =
-    request(params, util.Collections.emptyList[TextEdit]()) { pc =>
+    request(params, util.Collections.emptyList[TextEdit](), "rename") { pc =>
       new JavaRenameProvider(pc, params, Some(name)).rename().asJava
     }
 
   override def definition(
       params: OffsetParams
   ): CompletableFuture[DefinitionResult] = {
-    request(params, DefinitionResultImpl.empty) { pc =>
+    request(params, DefinitionResultImpl.empty, "definition") { pc =>
       new JavaDefinitionProvider(pc, params).definition()
     }
   }
@@ -210,7 +224,7 @@ case class JavaPresentationCompiler(
   override def declaration(
       params: OffsetParams
   ): CompletableFuture[DefinitionResult] = {
-    request(params, DefinitionResultImpl.empty) { pc =>
+    request(params, DefinitionResultImpl.empty, "declaration") { pc =>
       new JavaDefinitionProvider(pc, params, DeclarationDefinitionProcessor)
         .definition()
     }
@@ -219,7 +233,7 @@ case class JavaPresentationCompiler(
   override def typeDefinition(
       params: OffsetParams
   ): CompletableFuture[DefinitionResult] =
-    request(params, DefinitionResultImpl.empty) { pc =>
+    request(params, DefinitionResultImpl.empty, "typeDefinition") { pc =>
       new JavaDefinitionProvider(pc, params, TypeDefinitionProcessor)
         .definition()
     }
@@ -227,16 +241,23 @@ case class JavaPresentationCompiler(
   override def documentHighlight(
       params: OffsetParams
   ): CompletableFuture[util.List[DocumentHighlight]] =
-    request(params, util.Collections.emptyList[DocumentHighlight]()) { pc =>
+    request(
+      params,
+      util.Collections.emptyList[DocumentHighlight](),
+      "documentHighlight"
+    ) { pc =>
       new JavaDocumentHighlightProvider(pc, params).documentHighlight().asJava
     }
 
   override def references(
       params: ReferencesRequest
   ): CompletableFuture[util.List[ReferencesResult]] =
-    request(params.file(), util.Collections.emptyList[ReferencesResult]()) {
-      pc =>
-        new JavaReferencesProvider(params, pc).references().asJava
+    request(
+      params.file(),
+      util.Collections.emptyList[ReferencesResult](),
+      "references"
+    ) { pc =>
+      new JavaReferencesProvider(params, pc).references().asJava
     }
 
   override def getTasty(
@@ -250,7 +271,11 @@ case class JavaPresentationCompiler(
       params: OffsetParams,
       isExtension: lang.Boolean
   ): CompletableFuture[util.List[AutoImportsResult]] = {
-    request(params, util.Collections.emptyList[AutoImportsResult]()) { pc =>
+    request(
+      params,
+      util.Collections.emptyList[AutoImportsResult](),
+      "autoImports"
+    ) { pc =>
       new JavaAutoImportProvider(pc, params, name).autoImports().asJava
     }
   }
@@ -258,7 +283,11 @@ case class JavaPresentationCompiler(
   override def implementAbstractMembers(
       params: OffsetParams
   ): CompletableFuture[util.List[TextEdit]] =
-    request(params, util.Collections.emptyList[TextEdit]()) { pc =>
+    request(
+      params,
+      util.Collections.emptyList[TextEdit](),
+      "implementAbstractMembers"
+    ) { pc =>
       new JavaImplementAbstractMembersProvider(pc, params)
         .implementAbstractMembers()
         .asJava
@@ -273,7 +302,11 @@ case class JavaPresentationCompiler(
       params: RangeParams,
       stoppedLocationOffset: Int
   ): CompletableFuture[util.List[lsp4j.InlineValue]] =
-    request(params, util.Collections.emptyList[lsp4j.InlineValue]()) { pc =>
+    request(
+      params,
+      util.Collections.emptyList[lsp4j.InlineValue](),
+      "inlineValues"
+    ) { pc =>
       new JavaInlineValueProvider(pc, params, stoppedLocationOffset)
         .inlineValues()
         .asJava
@@ -283,12 +316,13 @@ case class JavaPresentationCompiler(
       range: RangeParams,
       extractionPos: OffsetParams
   ): CompletableFuture[util.List[TextEdit]] =
-    request(range, util.Collections.emptyList[TextEdit]()) { pc =>
-      new JavaExtractMethodProvider(
-        pc,
-        range,
-        extractionPos
-      ).extractMethod.asJava
+    request(range, util.Collections.emptyList[TextEdit](), "extractMethod") {
+      pc =>
+        new JavaExtractMethodProvider(
+          pc,
+          range,
+          extractionPos
+        ).extractMethod.asJava
     }
 
   override def convertToNamedArguments(
@@ -300,7 +334,11 @@ case class JavaPresentationCompiler(
   override def inlayHints(
       params: InlayHintsParams
   ): CompletableFuture[util.List[lsp4j.InlayHint]] =
-    request(params, util.Collections.emptyList[lsp4j.InlayHint]()) { pc =>
+    request(
+      params,
+      util.Collections.emptyList[lsp4j.InlayHint](),
+      "inlayHints"
+    ) { pc =>
       new JavaInlayHintsProvider(pc, params).inlayHints().asJava
     }
 
@@ -310,8 +348,9 @@ case class JavaPresentationCompiler(
     if (!config.emitDiagnostics) {
       CompletableFuture.completedFuture(Nil.asJava)
     } else {
-      request(params, util.Collections.emptyList[Diagnostic]()) { pc =>
-        new JavaDiagnosticProvider(pc, params).diagnostics().asJava
+      request(params, util.Collections.emptyList[Diagnostic](), "didChange") {
+        pc =>
+          new JavaDiagnosticProvider(pc, params).diagnostics().asJava
       }
     }
   }
@@ -330,15 +369,16 @@ case class JavaPresentationCompiler(
               case _ => None
             }
           else None
-        request(params, util.Collections.emptyList[TextEdit]()) { pc =>
-          new JavaChangeVariableTypeProvider(pc, params, diagnosticRange)
-            .textEdits()
-            .asJava
+        request(params, util.Collections.emptyList[TextEdit](), "codeAction") {
+          pc =>
+            new JavaChangeVariableTypeProvider(pc, params, diagnosticRange)
+              .textEdits()
+              .asJava
         }
       case CodeActionId.InlineValue =>
         val default: Either[String, util.List[TextEdit]] =
           Right(util.Collections.emptyList[TextEdit]())
-        request(params, default) { pc =>
+        request(params, default, "codeAction") { pc =>
           new JavaInlineValueRefactoringProvider(pc, params)
             .getInlineTextEdits() match {
             case Right(edits) => Right(edits.asJava)
@@ -365,7 +405,7 @@ case class JavaPresentationCompiler(
       code: String
   ): CompletableFuture[Array[Byte]] = {
     val params = CompilerVirtualFileParams(uri, code, EmptyCancelToken)
-    request(params, Array.emptyByteArray) { pc =>
+    request(params, Array.emptyByteArray, "semanticdbTextDocument") { pc =>
       new JavaSemanticdbProvider(pc).textDocumentBytes(params)
     }
   }
@@ -378,7 +418,11 @@ case class JavaPresentationCompiler(
     if (params.isEmpty()) {
       return CompletableFuture.completedFuture(Array.emptyByteArray)
     } else {
-      request(params.get(0), Array.emptyByteArray) { pc =>
+      request(
+        params.get(0),
+        Array.emptyByteArray,
+        "batchSemanticdbTextDocuments"
+      ) { pc =>
         new JavaSemanticdbProvider(pc).batchTextDocumentBytes(
           params.asScala.toList
         )
@@ -487,7 +531,7 @@ case class JavaPresentationCompiler(
   override def prepareRename(
       params: OffsetParams
   ): CompletableFuture[Optional[lsp4j.Range]] =
-    request(params, Optional.empty[lsp4j.Range]()) { pc =>
+    request(params, Optional.empty[lsp4j.Range](), "prepareRename") { pc =>
       new JavaRenameProvider(pc, params, None).prepareRename()
     }
 
