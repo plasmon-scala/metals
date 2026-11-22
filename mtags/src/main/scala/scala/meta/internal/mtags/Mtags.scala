@@ -9,7 +9,7 @@ import scala.meta.internal.jdk.CollectionConverters._
 import scala.meta.internal.jsemanticdb.Semanticdb
 import scala.meta.internal.metals.EmptyReportContext
 import scala.meta.internal.metals.ReportContext
-import scala.meta.internal.mtags.ScalametaCommonEnrichments._
+import scala.meta.internal.mtags.MtagsEnrichments._
 import scala.meta.internal.semanticdb.Language
 import scala.meta.internal.semanticdb.Scala._
 import scala.meta.internal.semanticdb.Schema

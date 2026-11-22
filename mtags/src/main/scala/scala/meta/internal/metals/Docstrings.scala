@@ -13,9 +13,9 @@ import scala.meta.inputs.Input
 import scala.meta.internal.jdk.CollectionConverters._
 import scala.meta.internal.mtags.GlobalSymbolIndex
 import scala.meta.internal.mtags.Mtags
+import scala.meta.internal.mtags.MtagsEnrichments._
 import scala.meta.internal.mtags.OnDemandSymbolIndex
 import scala.meta.internal.mtags.ScalaMtags
-import scala.meta.internal.mtags.ScalametaCommonEnrichments._
 import scala.meta.internal.mtags.SourcePath
 import scala.meta.internal.mtags.Symbol
 import scala.meta.internal.mtags.SymbolDefinition
@@ -259,7 +259,7 @@ class Docstrings(index: GlobalSymbolIndex, mtags: () => Mtags) {
 object Docstrings {
   def empty(javaHome: Path, mtags: () => Mtags): Docstrings =
     new Docstrings(
-      OnDemandSymbolIndex.empty(javaHome, mtags = mtags),
+      OnDemandSymbolIndex.empty(javaHome)(mtags().rc),
       mtags
     )
 }
