@@ -44,11 +44,15 @@ abstract class CompilerAccess[+Reporter, Compiler](
   private def _compiler: CompilerWrapper[Reporter, Compiler] =
     __compiler.asInstanceOf[CompilerWrapper[Reporter, Compiler]]
   private var isShutdown: Boolean = false
+  // Whether the current thread runs a job of the queue: jobs queued before a shutdown still run
+  private val inQueuedJob = new ThreadLocal[java.lang.Boolean] {
+    override def initialValue(): java.lang.Boolean = false
+  }
   private def isEmpty: Boolean = _compiler == null
   private def isDefined: Boolean = !isEmpty
   private def loadCompiler(): CompilerWrapper[Reporter, Compiler] =
     synchronized {
-      if (isShutdown) {
+      if (isShutdown && !inQueuedJob.get()) {
         throw new CancellationException()
       }
       if (_compiler == null) {
@@ -301,8 +305,14 @@ abstract class CompilerAccess[+Reporter, Compiler](
             Thread.interrupted() // clear interrupt bit
             val accessId = UUID.randomUUID().toString
             beforeAccess0.foreach(_(accessId, name, uri))
+            inQueuedJob.set(true)
             try result.complete(thunk())
-            finally afterAccess0.foreach(_(accessId, name, uri))
+            finally {
+              inQueuedJob.set(false)
+              // A job queued before a shutdown runs on a compiler of its own, stopped right after
+              if (isShutdown) shutdownCurrentCompiler()
+              afterAccess0.foreach(_(accessId, name, uri))
+            }
           }
         } catch {
           case NonFatal(e) =>
