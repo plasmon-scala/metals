@@ -207,7 +207,8 @@ trait ScalametaCommonEnrichments extends CommonMtagsEnrichments {
   private def isScalaFilename(filename: String): Boolean = {
     filename.endsWith(".scala") ||
     filename.endsWith(".sc") ||
-    filename.endsWith(".sbt")
+    filename.endsWith(".sbt") ||
+    filename.endsWith(".mill")
   }
 
   def filenameToJLanguage(filename: String): Semanticdb.Language = {
